@@ -4,7 +4,7 @@ Copyright (c) 2006 Microsoft Corporation
 
 Module Name:
 
-    wlsample.cpp
+    wlan.cpp
 
 Abstract:
 
@@ -13,6 +13,7 @@ Abstract:
 Date:
 	11/08/2005  created
     08/22/2006  modified
+	05/02/2017  add 11n/11ac
 
 Environment:
 
@@ -33,6 +34,8 @@ Environment:
 #include <iomanip>
 // headers needed to use WLAN APIs 
 #include <wlanapi.h>
+
+#include "version.h"
 
 using namespace std;
 
@@ -2615,8 +2618,9 @@ Help(
     if (argc == 1)
     {
         // show all commands
-        wcout << L"This is a sample showing how to use WLAN APIs to manager wireless networks." << endl;
-        wcout << L"The following commands are available. Use \"help xyz\" to show the description of command xyz." << endl;
+        wcout << L"wlan " << VERSION << endl;
+		wcout << L" The following commands are available." << endl;
+		wcout << L" Use \"help xyz\" to show the description of command xyz." << endl;
         for (i=0; i < sizeof(g_Commands)/sizeof(WLSAMPLE_COMMAND); i++)
         {
                 wcout << L"\t"<< g_Commands[i].strCommandName;
