@@ -280,6 +280,12 @@ GetPhyTypeString(
         case dot11_phy_type_ofdm:
             strRetCode = L"\"802.11a\"";
             break;
+		case dot11_phy_type_ht:
+			strRetCode = L"\"802.11n\"";
+			break;
+		case dot11_phy_type_vht:
+			strRetCode = L"\"802.11ac\"";
+			break;
         case dot11_phy_type_any:
             strRetCode = L"\"any\"";
             break;
