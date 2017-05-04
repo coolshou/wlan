@@ -27,3 +27,5 @@ The following commands are available. Use "help xyz" to show the description of 
         RegisterNotif(r)
         help(?)
 
+# reference
+  https://msdn.microsoft.com/en-us/library/windows/desktop/ms706275(v=vs.85).aspx
