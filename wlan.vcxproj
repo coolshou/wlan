@@ -154,7 +154,6 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <EntryPointSymbol />
       <TargetMachine>MachineX86</TargetMachine>
-      <AllowIsolation>false</AllowIsolation>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>$(SolutionDir)\lib\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
@@ -189,7 +188,6 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <EntryPointSymbol />
       <TargetMachine>MachineX64</TargetMachine>
-      <AllowIsolation>false</AllowIsolation>
       <SuppressStartupBanner>true</SuppressStartupBanner>
     </Link>
     <Manifest>

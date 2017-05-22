@@ -32,6 +32,9 @@ Environment:
 #include <atlbase.h>
 #include <iostream>
 #include <iomanip>
+#include <vector>
+#include <atlstr.h>
+
 // headers needed to use WLAN APIs 
 #include <wlanapi.h>
 
@@ -43,6 +46,51 @@ using namespace std;
 #define WIN32_FROM_HRESULT(hr)           \
     (SUCCEEDED(hr) ? ERROR_SUCCESS :    \
         (HRESULT_FACILITY(hr) == FACILITY_WIN32 ? HRESULT_CODE(hr) : (hr)))
+
+DWORD OSMajor;
+
+// os version
+typedef void (WINAPI *RtlGetVersion_FUNC)(OSVERSIONINFOEXW*);
+BOOL GetVersion2(OSVERSIONINFOEX* os) {
+	HMODULE hMod;
+	RtlGetVersion_FUNC func;
+#ifdef UNICODE
+	OSVERSIONINFOEXW* osw = os;
+#else
+	OSVERSIONINFOEXW o;
+	OSVERSIONINFOEXW* osw = &o;
+#endif
+
+	hMod = LoadLibrary(TEXT("ntdll.dll"));
+	if (hMod) {
+		func = (RtlGetVersion_FUNC)GetProcAddress(hMod, "RtlGetVersion");
+		if (func == 0) {
+			FreeLibrary(hMod);
+			return FALSE;
+		}
+		ZeroMemory(osw, sizeof(*osw));
+		osw->dwOSVersionInfoSize = sizeof(*osw);
+		func(osw);
+#ifndef	UNICODE
+		os->dwBuildNumber = osw->dwBuildNumber;
+		os->dwMajorVersion = osw->dwMajorVersion;
+		os->dwMinorVersion = osw->dwMinorVersion;
+		os->dwPlatformId = osw->dwPlatformId;
+		os->dwOSVersionInfoSize = sizeof(*os);
+		DWORD sz = sizeof(os->szCSDVersion);
+		WCHAR* src = osw->szCSDVersion;
+		unsigned char* dtc = (unsigned char*)os->szCSDVersion;
+		while (*src)
+			*dtc++ = (unsigned char)*src++;
+		*dtc = '¥0';
+#endif
+
+	}
+	else
+		return FALSE;
+	FreeLibrary(hMod);
+	return TRUE;
+}
 
 
 //
@@ -430,7 +478,44 @@ GetCipherAlgoString(
 
     return strRetCode;
 }
+//get BSSID from the WCHAR string
+/*strBssid: 00:11:22:33:44:55
+//          00-11-22-33-44-55
+*/
+DWORD StringWToBSSID(
+	__in string strBssid,
+	__out uint8_t *results
+//	__out vector<string>* results
+)
+{
+	DWORD dwRetCode = ERROR_SUCCESS;
+	BYTE pbSsid[DOT11_SSID_MAX_LENGTH + 1] = { 0 };
 
+	if (strBssid.empty()  || results == NULL)
+	{
+		dwRetCode = ERROR_INVALID_PARAMETER;
+	}
+	else
+	{
+		//TODO: check strBssid format
+		// parser strBssid
+		string separator = ":";
+		//int found;
+		size_t found;
+		found = strBssid.find_first_of(separator);
+		while (found != string::npos) {
+			if (found > 0) {
+				//results->push_back(strBssid.substr(0, found));
+			}
+			strBssid = strBssid.substr(found + 1);
+			found = strBssid.find_first_of(separator);
+		}
+		if (strBssid.length() > 0) {
+			//results->push_back(strBssid);
+		}
+	}
+	return dwRetCode;
+}
 // get SSID from the WCHAR string
 DWORD
 StringWToSsid(
@@ -531,7 +616,7 @@ VOID PrintNetworkInfo(
             wcout << L"\tSecurity not enabled." << endl;
         }
 
-        // number of BSSIDs
+        // number of BSSIDs //TODO: list all BSSID
         wcout << L"\tContains " << pNetwork->uNumberOfBssids << L" BSSIDs." << endl;
 
         // whether have a profile for this SSID
@@ -588,7 +673,10 @@ PrintBssInfo(
         wcout << L"MAC address: ";
         for (i = 0; i < 6; i++)
         {
-            wcout << setw(2) << setfill(L'0') << hex << (UINT)pBss->dot11Bssid[i] <<L" ";
+			wcout << setw(2) << setfill(L'0') << hex << (UINT)pBss->dot11Bssid[i];// << L":";
+			if (i < 5) {
+				wcout << L":";
+			}
         }
         wcout << endl;
         
@@ -598,22 +686,23 @@ PrintBssInfo(
         // Beacon period
         wcout << L"\tBeacon period: " << dec << pBss->usBeaconPeriod << L" TU" << endl;
         
-        // IE
-        wcout << L"\tIE";
-        i = 0;
-        pIe = (PBYTE)(pBss) + pBss->ulIeOffset;
+        // IE , TODO: parser IE for MU MIMO/TxBF....
+		if (0) {
+			wcout << L"\tIE";
+			i = 0;
+			pIe = (PBYTE)(pBss)+pBss->ulIeOffset;
 
-        // print 8 byte per line
-        while (i < pBss->ulIeSize)
-        {
-            if (i % 8 == 0)
-            {
-                wcout << endl << L"\t\t";
-            }
-            wcout << setw(2) << setfill(L'0') << hex << (UINT)pIe[i] << L" ";
-            i++;
-        }
-
+			// print 8 byte per line
+			while (i < pBss->ulIeSize)
+			{
+				if (i % 8 == 0)
+				{
+					wcout << endl << L"\t\t";
+				}
+				wcout << setw(2) << setfill(L'0') << hex << (UINT)pIe[i] << L" ";
+				i++;
+			}
+		}
         wcout << endl;
     }
     
@@ -1107,6 +1196,88 @@ DeleteProfile(
     PrintErrorMsg(argv[0], dwError);
 }
 
+// delete profile list (clear all profile)
+VOID
+DeleteProfileList(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+) 
+{
+	DWORD dwError = ERROR_SUCCESS;
+	HANDLE hClient = NULL;
+	GUID guidIntf;
+
+	PWLAN_PROFILE_INFO_LIST pProfileList = NULL;
+	PWLAN_PROFILE_INFO pInfo = NULL;
+	UINT i;
+
+	__try
+	{
+		if (argc != 2)
+		{
+			dwError = ERROR_INVALID_PARAMETER;
+			__leave;
+		}
+
+		// get the interface GUID
+		if (UuidFromString((RPC_WSTR)argv[1], &guidIntf) != RPC_S_OK)
+		{
+			wcerr << L"Invalid GUID " << argv[1] << endl;
+			dwError = ERROR_INVALID_PARAMETER;
+			__leave;
+		}
+
+
+		// open handle
+		if ((dwError = OpenHandleAndCheckVersion(
+			&hClient
+		)) != ERROR_SUCCESS)
+		{
+			__leave;
+		}
+		// get profile list
+		if ((dwError = WlanGetProfileList(
+			hClient,
+			&guidIntf,
+			NULL,               // reserved
+			&pProfileList
+		)) != ERROR_SUCCESS)
+		{
+			__leave;
+		}
+
+		wcout << L"There are " << pProfileList->dwNumberOfItems << L" profiles on the interface." << endl;
+		// print out profiles
+		for (i = 0; i < pProfileList->dwNumberOfItems; i++)
+		{
+			pInfo = &pProfileList->ProfileInfo[i];
+			wcout << L"\t\"" << pInfo->strProfileName << L"\"" << endl;
+			// delete profile
+			dwError = WlanDeleteProfile(
+				hClient,
+				&guidIntf,
+				pInfo->strProfileName,        // profile name
+				NULL            // reserved
+			);
+		}
+		
+
+	}
+	__finally
+	{
+		// clean up
+		if (hClient != NULL)
+		{
+			WlanCloseHandle(
+				hClient,
+				NULL            // reserved
+			);
+		}
+	}
+
+	PrintErrorMsg(argv[0], dwError);
+}
+
 // set profile list
 VOID 
 SetProfileList(
@@ -1290,15 +1461,27 @@ EnumInterface(
         // print out interface information
         for (i = 0; i < pIntfList->dwNumberOfItems; i++)
         {
-            wcout << L"Interface " << i << L":" << endl;
-            if (UuidToStringW(&pIntfList->InterfaceInfo[i].InterfaceGuid, &strGuid) == RPC_S_OK)
-            {
-                wcout << L"\tGUID: " << (LPWSTR)strGuid << endl;
-                RpcStringFreeW(&strGuid);
-            }
-            wcout << L"\t" << pIntfList->InterfaceInfo[i].strInterfaceDescription << endl;
-            wcout << L"\tState: " << GetInterfaceStateString(pIntfList->InterfaceInfo[i].isState) << endl;
-            wcout << endl;
+			if (true) { //jimmy, change output format for easy parser, one line one device
+				wcout << L"Interface " << i << L":";
+				if (UuidToStringW(&pIntfList->InterfaceInfo[i].InterfaceGuid, &strGuid) == RPC_S_OK)
+				{
+					wcout << L"\tGUID: " << (LPWSTR)strGuid ;
+					RpcStringFreeW(&strGuid);
+				}
+				wcout << L"\tNAME: " << pIntfList->InterfaceInfo[i].strInterfaceDescription << endl;
+				//wcout << L"\tState: " << GetInterfaceStateString(pIntfList->InterfaceInfo[i].isState) << endl;
+			}
+			else {
+				wcout << L"Interface " << i << L":" << endl;
+				if (UuidToStringW(&pIntfList->InterfaceInfo[i].InterfaceGuid, &strGuid) == RPC_S_OK)
+				{
+					wcout << L"\tGUID: " << (LPWSTR)strGuid << endl;
+					RpcStringFreeW(&strGuid);
+				}
+				wcout << L"\tNAME: " << pIntfList->InterfaceInfo[i].strInterfaceDescription << endl;
+				wcout << L"\tState: " << GetInterfaceStateString(pIntfList->InterfaceInfo[i].isState) << endl;
+				wcout << endl;
+			}
         }
     }
     __finally
@@ -1459,6 +1642,144 @@ GetInterfaceCapability(
     }
 
     PrintErrorMsg(argv[0], dwError);
+}
+
+// query interface connection state
+VOID
+State(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+)
+{
+	DWORD dwError = ERROR_SUCCESS;
+	HANDLE hClient = NULL;
+	GUID guidIntf;
+	WLAN_INTERFACE_STATE isState;
+	PWLAN_CONNECTION_ATTRIBUTES pCurrentNetwork = NULL;
+	WCHAR strSsid[DOT11_SSID_MAX_LENGTH + 1];
+	//WLAN_RADIO_STATE wlanRadioState;
+	PVOID pData = NULL;
+	DWORD dwDataSize = 0;
+	//UINT i;
+
+	__try
+	{
+		if (argc != 2)
+		{
+			dwError = ERROR_INVALID_PARAMETER;
+			__leave;
+		}
+
+		// get the interface GUID
+		if (UuidFromString((RPC_WSTR)argv[1], &guidIntf) != RPC_S_OK)
+		{
+			wcerr << L"Invalid GUID " << argv[1] << endl;
+			dwError = ERROR_INVALID_PARAMETER;
+			__leave;
+		}
+
+		// open handle
+		if ((dwError = OpenHandleAndCheckVersion(
+			&hClient
+		)) != ERROR_SUCCESS)
+		{
+			__leave;
+		}
+
+		// query interface state
+		if ((dwError = WlanQueryInterface(
+			hClient,
+			&guidIntf,
+			wlan_intf_opcode_interface_state,
+			NULL,                       // reserved
+			&dwDataSize,
+			&pData,
+			NULL                        // not interesed in the type of the opcode value
+		)) != ERROR_SUCCESS)
+		{
+			__leave;
+		}
+
+		if (dwDataSize != sizeof(WLAN_INTERFACE_STATE))
+		{
+			dwError = ERROR_INVALID_DATA;
+			__leave;
+		}
+
+		isState = *((PWLAN_INTERFACE_STATE)pData);
+
+		// print interface state
+		wcout << L"Interface state: " << GetInterfaceStateString(isState) << L"." << endl;
+
+		WlanFreeMemory(pData);
+		pData = NULL;
+
+		// query the current connection
+		if ((dwError = WlanQueryInterface(
+			hClient,
+			&guidIntf,
+			wlan_intf_opcode_current_connection,
+			NULL,                       // reserved
+			&dwDataSize,
+			&pData,
+			NULL                        // not interesed in the type of the opcode value
+		)) == ERROR_SUCCESS &&
+			dwDataSize == sizeof(WLAN_CONNECTION_ATTRIBUTES)
+			)
+		{
+			pCurrentNetwork = (PWLAN_CONNECTION_ATTRIBUTES)pData;
+		}
+
+		// we don't treat ERROR_INVALID_STATE as an error for querying the interface
+		if (dwError == ERROR_INVALID_STATE)
+		{
+			dwError = ERROR_SUCCESS;
+		}
+
+		if (pCurrentNetwork == NULL)
+		{
+			// no connection information
+			__leave;
+		}
+
+		// print current connection information
+		if (pCurrentNetwork->isState == wlan_interface_state_connected)
+			wcout << L" Currently connected to \"";
+		else if (pCurrentNetwork->isState == wlan_interface_state_ad_hoc_network_formed)
+			wcout << L" Currently formed \"";
+		else if (pCurrentNetwork->isState == wlan_interface_state_associating ||
+			pCurrentNetwork->isState == wlan_interface_state_discovering ||
+			pCurrentNetwork->isState == wlan_interface_state_authenticating
+			)
+			wcout << L" Currently connecting to \"";
+
+		wcout << SsidToStringW(strSsid, sizeof(strSsid) / sizeof(WCHAR), &pCurrentNetwork->wlanAssociationAttributes.dot11Ssid);
+		wcout << L"\" using profile \"" << pCurrentNetwork->strProfileName << "\"" << endl;
+		wcout << L" connection mode: " << GetConnectionModeString(pCurrentNetwork->wlanConnectionMode) << endl;
+		wcout << L" BSS type: " << GetBssTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11BssType) << endl;
+
+		wcout << L" PHY type: ";
+		wcout << GetPhyTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11PhyType) << endl;
+
+	}
+	__finally
+	{
+		if (pData != NULL)
+		{
+			WlanFreeMemory(pData);
+		}
+
+		// clean up
+		if (hClient != NULL)
+		{
+			WlanCloseHandle(
+				hClient,
+				NULL            // reserved
+			);
+		}
+	}
+
+	PrintErrorMsg(argv[0], dwError);
 }
 
 // set the radio state
@@ -2099,6 +2420,7 @@ GetBssList(
     PrintErrorMsg(argv[0], dwError);
 }
 
+//https://msdn.microsoft.com/en-us/library/windows/desktop/ms706851(v=vs.85).aspx
 // connect to a network using a saved profile
 VOID 
 Connect(
@@ -2106,12 +2428,16 @@ Connect(
     __in_ecount(argc) LPWSTR argv[]
 )
 {
+
     DWORD dwError = ERROR_SUCCESS;
     HANDLE hClient = NULL;
     GUID guidIntf;
     DOT11_SSID dot11Ssid = {0};
     WLAN_CONNECTION_PARAMETERS wlanConnPara;
-
+	/*
+	if (argc == 6) {
+		string macstring = CW2A(argv[5]);
+	}*/
     __try
     {
         if (argc != 5)
@@ -2151,9 +2477,54 @@ Connect(
             dwError = ERROR_INVALID_PARAMETER;
             __leave;
         }
+		
+		if (OSMajor >= 6) {
+			
+			if (argc == 6) {
+				// DOT11_BSSID_LIST 
+				DOT11_BSSID_LIST DesiredBssidList;
 
-        // the desired BSSID list is empty
-        wlanConnPara.pDesiredBssidList = NULL;
+				//WLAN_BSS_LIST *bsslst;
+				//WlanGetNetworkBssList(hClientHandle, &pIfInfo->InterfaceGuid, &pBssList->Network[j].dot11Ssid, pBssList->Network[j].dot11BssType, true, NULL, &bsslst);
+				DesiredBssidList.Header.Type = NDIS_OBJECT_TYPE_DEFAULT;
+				DesiredBssidList.Header.Revision = DOT11_BSSID_LIST_REVISION_1;
+				DesiredBssidList.Header.Size = sizeof(DOT11_BSSID_LIST);
+				DesiredBssidList.uNumOfEntries = 1; // If I change this to 0, it connects without a problem, but I can't control to which AP
+				DesiredBssidList.uTotalNumOfEntries = 1;
+				
+				//unsigned char MAC[6];
+				//vector<string> R; //cause VC C2712
+				/*
+				uint8_t R[6];
+				
+				
+				
+				//if ((dwError = StringWToBSSID(macstring, &R)) != ERROR_SUCCESS) {
+				if ((dwError = StringWToBSSID(macstring, R)) != ERROR_SUCCESS) {
+					dwError = ERROR_INVALID_PARAMETER;
+					__leave;
+				}
+				//for (int i = 0; (i < 6) && (i < R.size()); ++i) {
+				for (int i = 0; (i < 6); ++i) {
+					//MAC[i] = (unsigned char)strtoul(R[i].c_str(), NULL, 16);
+					//DesiredBssidList.BSSIDs[0][i] = (unsigned char)strtoul(R[i].c_str(), NULL, 16);
+					DesiredBssidList.BSSIDs[0][i] = R[i];
+				}
+				printf("BSSID %02x:%02x:%02x:%02x:%02x:%02x\n",
+					DesiredBssidList.BSSIDs[0][0], DesiredBssidList.BSSIDs[0][1],
+					DesiredBssidList.BSSIDs[0][2], DesiredBssidList.BSSIDs[0][3],
+					DesiredBssidList.BSSIDs[0][3], DesiredBssidList.BSSIDs[0][5]);
+					*/
+				wlanConnPara.pDesiredBssidList = &DesiredBssidList;
+			}
+			else {
+				wlanConnPara.pDesiredBssidList = NULL;
+			}
+			
+		} else {
+			// the desired BSSID list is empty (XP must NULL)
+			wlanConnPara.pDesiredBssidList = NULL;
+		}
         // no connection flags
         wlanConnPara.dwFlags = 0;
 
@@ -2539,6 +2910,15 @@ WLSAMPLE_COMMAND g_Commands[] = {
         TRUE,
         L"Use EnumInterface (ei) command to get the GUID of an interface."
     },
+	{
+		L"DeleteProfileList",
+		L"dpl",
+		DeleteProfileList,
+		L"Delete all saved profiles.",
+		L"<interface GUID>",
+		TRUE,
+		L"Use EnumInterface (ei) command to get the GUID of an interface."
+	},
     {
         L"SetProfileList",
         L"spl",
@@ -2563,7 +2943,7 @@ WLSAMPLE_COMMAND g_Commands[] = {
         L"conn",
         Connect,
         L"Connect to a wireless network using a saved profile.",
-        L"<interface GUID> <SSID> <infrastructure(i)|adhoc(a)> <profile name>",
+        L"<interface GUID> <SSID> <infrastructure(i)|adhoc(a)> <profile name> <BSSID>",
         TRUE,
         L"Use EnumInterface (ei) command to get the GUID of an interface."
     },
@@ -2585,6 +2965,15 @@ WLSAMPLE_COMMAND g_Commands[] = {
         TRUE,
         L"Use EnumInterface (ei) command to get the GUID of an interface."
     },
+	{
+		L"State",
+		L"st",
+		State,
+		L"Get current state of an interface.",
+		L"<interface GUID>",
+		TRUE,
+		L"Use EnumInterface (ei) command to get the GUID of an interface."
+	},
     // other commands
     {
         L"RegisterNotif",
@@ -2682,6 +3071,7 @@ ExecuteCommand(
 }
 
 // the main program
+
 int _cdecl 
 wmain(
     __in int argc, 
@@ -2689,7 +3079,11 @@ wmain(
 )
 {
     DWORD dwRetCode = ERROR_SUCCESS;
-    
+	OSVERSIONINFOEX os;
+	if (GetVersion2(&os) == TRUE) {
+		//wcout << L"os major ver: " << os.dwMajorVersion << endl;
+		OSMajor = os.dwMajorVersion;
+	}
     if (argc <= 1)
     {
         wcout << L"Please type \"" << argv[0] << L" ?\" for help." << endl;
