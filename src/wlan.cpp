@@ -1775,24 +1775,24 @@ State(
 
 		// print current connection information
 		if (pCurrentNetwork->isState == wlan_interface_state_connected)
-			wcout << L" Currently connected to \"";
+			wcout << L"\tCurrently connected to \"";
 		else if (pCurrentNetwork->isState == wlan_interface_state_ad_hoc_network_formed)
-			wcout << L" Currently formed \"";
+			wcout << L"\tCurrently formed \"";
 		else if (pCurrentNetwork->isState == wlan_interface_state_associating ||
 			pCurrentNetwork->isState == wlan_interface_state_discovering ||
 			pCurrentNetwork->isState == wlan_interface_state_authenticating
 			)
-			wcout << L" Currently connecting to \"";
+			wcout << L"\tCurrently connecting to \"";
 
 		wcout << SsidToStringW(strSsid, sizeof(strSsid) / sizeof(WCHAR), &pCurrentNetwork->wlanAssociationAttributes.dot11Ssid);
 		wcout << L"\" using profile \"" << pCurrentNetwork->strProfileName << "\"" << endl;
-		wcout << L" connection mode: " << GetConnectionModeString(pCurrentNetwork->wlanConnectionMode) << endl;
-		wcout << L" BSS type: " << GetBssTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11BssType) << endl;
-		wcout << L" BSSID: " << GetBssidString(pCurrentNetwork->wlanAssociationAttributes.dot11Bssid) << endl;
-		wcout << L" PHY type: " << GetPhyTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11PhyType) << endl;
-		wcout << L" Signal: " << pCurrentNetwork->wlanAssociationAttributes.wlanSignalQuality << endl;
-		wcout << L" Tx Rate: " << pCurrentNetwork->wlanAssociationAttributes.ulTxRate << endl;
-		wcout << L" Rx Rate: " << pCurrentNetwork->wlanAssociationAttributes.ulRxRate << endl;
+		wcout << L"\tconnection mode: " << GetConnectionModeString(pCurrentNetwork->wlanConnectionMode) << endl;
+		wcout << L"\tBSS type: " << GetBssTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11BssType) << endl;
+		wcout << L"\tBSSID: " << GetBssidString(pCurrentNetwork->wlanAssociationAttributes.dot11Bssid) << endl;
+		wcout << L"\tPHY type: " << GetPhyTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11PhyType) << endl;
+		wcout << L"\tSignal: " << pCurrentNetwork->wlanAssociationAttributes.wlanSignalQuality << endl;
+		wcout << L"\tTx Rate: " << pCurrentNetwork->wlanAssociationAttributes.ulTxRate << endl;
+		wcout << L"\tRx Rate: " << pCurrentNetwork->wlanAssociationAttributes.ulRxRate << endl;
 	}
 	__finally
 	{
