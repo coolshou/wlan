@@ -657,6 +657,21 @@ VOID PrintNetworkInfo(
     }
 }
 
+// get BSSID string
+char*
+GetBssidString(
+	__in DOT11_MAC_ADDRESS Bssid
+)
+{
+	static char str[18];
+	UINT i;
+
+	// MAC address
+	snprintf(str, sizeof(str), "%02X:%02X:%02X:%02X:%02X:%02X",
+		Bssid[0], Bssid[1], Bssid[2], Bssid[3], Bssid[4], Bssid[5]);
+	return str;
+
+}
 // print BSS info
 VOID 
 PrintBssInfo(
@@ -671,15 +686,17 @@ PrintBssInfo(
     {
         // MAC address
         wcout << L"MAC address: ";
-        for (i = 0; i < 6; i++)
+		/*
+		for (i = 0; i < 6; i++)
         {
 			wcout << setw(2) << setfill(L'0') << hex << (UINT)pBss->dot11Bssid[i];// << L":";
 			if (i < 5) {
 				wcout << L":";
 			}
         }
-        wcout << endl;
-        
+		*/
+		wcout << GetBssidString(pBss->dot11Bssid);
+		wcout << endl;
         // SSID
         wcout << L"\tSSID: " << SsidToStringW(strSsid, sizeof(strSsid)/sizeof(WCHAR), &pBss->dot11Ssid) << endl;
 
@@ -1771,9 +1788,11 @@ State(
 		wcout << L"\" using profile \"" << pCurrentNetwork->strProfileName << "\"" << endl;
 		wcout << L" connection mode: " << GetConnectionModeString(pCurrentNetwork->wlanConnectionMode) << endl;
 		wcout << L" BSS type: " << GetBssTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11BssType) << endl;
-
+		wcout << L" BSSID: " << GetBssidString(pCurrentNetwork->wlanAssociationAttributes.dot11Bssid) << endl;
 		wcout << L" PHY type: " << GetPhyTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11PhyType) << endl;
-
+		wcout << L" Signal: " << pCurrentNetwork->wlanAssociationAttributes.wlanSignalQuality << endl;
+		wcout << L" Tx Rate: " << pCurrentNetwork->wlanAssociationAttributes.ulTxRate << endl;
+		wcout << L" Rx Rate: " << pCurrentNetwork->wlanAssociationAttributes.ulRxRate << endl;
 	}
 	__finally
 	{
