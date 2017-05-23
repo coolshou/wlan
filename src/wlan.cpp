@@ -313,23 +313,26 @@ GetPhyTypeString(
 
     switch(uDot11PhyType)
     {
-        case dot11_phy_type_dsss:
+		case dot11_phy_type_any:
+			strRetCode = L"\"any\"";
+			break;
+		case dot11_phy_type_fhss:
+			strRetCode = L"\"FHSS\"";
+			break;
+		case dot11_phy_type_dsss:
             strRetCode = L"\"DSSS\"";
             break;
-        case dot11_phy_type_erp:
+		case dot11_phy_type_irbaseband:
+			strRetCode = L"\"IR-base band\"";
+			break;
+		case dot11_phy_type_ofdm:
+			strRetCode = L"\"802.11a\"";
+			break;
+		case dot11_phy_type_hrdsss:
+			strRetCode = L"\"802.11b\"";
+			break;
+		case dot11_phy_type_erp:
             strRetCode = L"\"802.11g\"";
-            break;
-        case dot11_phy_type_fhss:
-            strRetCode = L"\"FHSS\"";
-            break;
-        case dot11_phy_type_hrdsss:
-            strRetCode = L"\"802.11b\"";
-            break;
-        case dot11_phy_type_irbaseband:
-            strRetCode = L"\"IR-base band\"";
-            break;
-        case dot11_phy_type_ofdm:
-            strRetCode = L"\"802.11a\"";
             break;
 		case dot11_phy_type_ht:
 			strRetCode = L"\"802.11n\"";
@@ -337,9 +340,6 @@ GetPhyTypeString(
 		case dot11_phy_type_vht:
 			strRetCode = L"\"802.11ac\"";
 			break;
-        case dot11_phy_type_any:
-            strRetCode = L"\"any\"";
-            break;
         default:
             strRetCode = L"\"Unknown PHY type\"";
     }
@@ -1179,7 +1179,11 @@ DeleteProfile(
                         argv[2],        // profile name
                         NULL            // reserved
                         );
-
+		if (dwError != ERROR_SUCCESS) {
+			wcerr << L"DeleteProfile failed on \"" << &guidIntf;
+			wcerr << L"\" with error: " <<	dwError << endl;
+			//TODO: use FormatMessage to find out why the function failed
+		}
     }
     __finally
     {
@@ -1259,6 +1263,12 @@ DeleteProfileList(
 				pInfo->strProfileName,        // profile name
 				NULL            // reserved
 			);
+			if (dwError != ERROR_SUCCESS) {
+				wcerr << L"DeleteProfileList failed to delete \"" << pInfo->strProfileName; 
+				wcerr << L"\" on interface \"" << &guidIntf;
+				wcerr << L"\" with error: " << dwError << endl;
+				//TODO: use FormatMessage to find out why the function failed
+			}
 		}
 		
 
@@ -1266,6 +1276,10 @@ DeleteProfileList(
 	__finally
 	{
 		// clean up
+		if (pProfileList != NULL) {
+			WlanFreeMemory(pProfileList);
+			pProfileList = NULL;
+		}
 		if (hClient != NULL)
 		{
 			WlanCloseHandle(
@@ -1758,8 +1772,7 @@ State(
 		wcout << L" connection mode: " << GetConnectionModeString(pCurrentNetwork->wlanConnectionMode) << endl;
 		wcout << L" BSS type: " << GetBssTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11BssType) << endl;
 
-		wcout << L" PHY type: ";
-		wcout << GetPhyTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11PhyType) << endl;
+		wcout << L" PHY type: " << GetPhyTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11PhyType) << endl;
 
 	}
 	__finally
