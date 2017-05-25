@@ -1541,6 +1541,7 @@ EnumInterface(
 
 #define MALLOC(x) HeapAlloc(GetProcessHeap(), 0, (x)) 
 #define FREE(x) HeapFree(GetProcessHeap(), 0, (x))
+
 //get network interface name
 DWORD
 GetInterfaceName(
@@ -1548,51 +1549,72 @@ GetInterfaceName(
 	__in_ecount(argc) LPWSTR argv[]
 ) 
 {
+	DWORD dwError = ERROR_SUCCESS;
 	// Declare and initialize variables
 	PIP_INTERFACE_INFO pInfo = NULL;
 	ULONG ulOutBufLen = 0;
 
-	DWORD dwRetVal = 0;
-	int iReturn = 1;
+	//DWORD dwRetVal = 0;
+	//int iReturn = 1;
 
 	int i;
+	__try
+	{
+		if (argc != 1)
+		{
+			dwError = ERROR_INVALID_PARAMETER;
+			__leave;
+		}
+		// Make an initial call to GetInterfaceInfo to get
+		// the necessary size in the ulOutBufLen variable
+		dwError = GetInterfaceInfo(NULL, &ulOutBufLen);
+		if (dwError == ERROR_INSUFFICIENT_BUFFER) {
+			pInfo = (IP_INTERFACE_INFO *)MALLOC(ulOutBufLen);
+			if (pInfo == NULL) {
+				wcerr << "Unable to allocate memory needed to call GetInterfaceInfo\n" << endl;
+				__leave;
+			}
+		}
+		// Make a second call to GetInterfaceInfo to get
+		// the actual data we need
+		dwError = GetInterfaceInfo(pInfo, &ulOutBufLen);
+		if (dwError == NO_ERROR) {
+			wcout << "Number of Adapters: " <<  pInfo->NumAdapters <<endl;
+			for (i = 0; i < pInfo->NumAdapters; i++) {
+				wcout << "Adapter Index[" << i << "]: " << pInfo->Adapter[i].Index << endl;
+				wcout << "Adapter Name[" << i << "]: " << pInfo->Adapter[i].Name << endl;
+			}
+			//dwError = ERROR_SUCCESS;
+		}
+		else if (dwError == ERROR_NO_DATA) {
+			wcerr << "There are no network adapters with IPv4 enabled on the local system" << endl;
+		}
+		else {
+			wcerr << "GetInterfaceInfo failed with error: %d" << dwError << endl;
+			LPVOID lpMsgBuf;
 
-	// Make an initial call to GetInterfaceInfo to get
-	// the necessary size in the ulOutBufLen variable
-	dwRetVal = GetInterfaceInfo(NULL, &ulOutBufLen);
-	if (dwRetVal == ERROR_INSUFFICIENT_BUFFER) {
-		pInfo = (IP_INTERFACE_INFO *)MALLOC(ulOutBufLen);
-		if (pInfo == NULL) {
-			printf
-			("Unable to allocate memory needed to call GetInterfaceInfo\n");
-			//return 1;
+			if (FormatMessage(
+				FORMAT_MESSAGE_ALLOCATE_BUFFER |
+				FORMAT_MESSAGE_FROM_SYSTEM |
+				FORMAT_MESSAGE_IGNORE_INSERTS,
+				NULL,
+				dwError,
+				MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
+				(LPTSTR)&lpMsgBuf,
+				0,
+				NULL)) {
+				wcerr << "\tError: " << lpMsgBuf <<endl;
+			}
+			LocalFree(lpMsgBuf);
 		}
 	}
-	// Make a second call to GetInterfaceInfo to get
-	// the actual data we need
-	dwRetVal = GetInterfaceInfo(pInfo, &ulOutBufLen);
-	if (dwRetVal == NO_ERROR) {
-		printf("Number of Adapters: %ld\n\n", pInfo->NumAdapters);
-		for (i = 0; i < pInfo->NumAdapters; i++) {
-			printf("Adapter Index[%d]: %ld\n", i,
-				pInfo->Adapter[i].Index);
-			printf("Adapter Name[%d]: %ws\n\n", i,
-				pInfo->Adapter[i].Name);
-		}
-		iReturn = 0;
+	__finally
+	{
+		// clean up
+		FREE(pInfo);
 	}
-	else if (dwRetVal == ERROR_NO_DATA) {
-		printf
-		("There are no network adapters with IPv4 enabled on the local system\n");
-		iReturn = 0;
-	}
-	else {
-		printf("GetInterfaceInfo failed with error: %d\n", dwRetVal);
-		iReturn = 1;
-	}
-
-	FREE(pInfo);
-	return (iReturn);
+	PrintErrorMsg(argv[0], dwError);
+	return (dwError);
 }
 // get interface capability and supported auth/cipher
 DWORD
