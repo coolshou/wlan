@@ -145,7 +145,7 @@
       <SuppressStartupBanner>false</SuppressStartupBanner>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>wlanapi.lib;rpcrt4.lib;msxml6.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>wlanapi.lib;rpcrt4.lib;msxml6.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(ProjectName).exe</OutputFile>
       <DelayLoadDLLs />
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -178,7 +178,7 @@
       <SuppressStartupBanner>true</SuppressStartupBanner>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>wlanapi.lib;rpcrt4.lib;msxml6.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>wlanapi.lib;rpcrt4.lib;msxml6.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)$(ProjectName).exe</OutputFile>
       <AdditionalLibraryDirectories>$(SolutionDir)\lib\$(Platform);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <DelayLoadDLLs />
@@ -212,6 +212,9 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="wlan.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="wlan.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
