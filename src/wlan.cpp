@@ -8,7 +8,7 @@ Module Name:
 
 Abstract:
 
-    Sample code for WLAN APIs
+    Use WLAN APIs to control wireless device
 
 Date:
 	11/08/2005  created
@@ -23,6 +23,7 @@ Environment:
 // define this flag for COM
 #define _WIN32_DCOM
 
+#include <WinSock2.h>
 #include <windows.h>
 #include <conio.h>
 #include <objbase.h>
@@ -35,6 +36,7 @@ Environment:
 #include <vector>
 #include <atlstr.h>
 
+#include <netioapi.h> //MIB_IF_TABLE2
 #include <iphlpapi.h>
 #include <iostream>
 #include <algorithm>
@@ -1539,6 +1541,70 @@ EnumInterface(
 	return dwError;
 }
 
+DWORD
+GetInterfaceList(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+)
+{
+	DWORD dwError = ERROR_SUCCESS;
+	int if_type = 0;
+	PMIB_IF_TABLE2 if_table = NULL;
+	unsigned long size = 0;
+	unsigned int i;
+	RPC_WSTR strGuid = NULL;
+	__try
+	{
+		if (argc != 1)
+		{
+			dwError = ERROR_INVALID_PARAMETER;
+			__leave;
+		}
+		// Retrieve list of network interfaces
+		//vista above only
+		//wcout << "GetIfTable2" << endl;
+		if (GetIfTable2(&if_table) == NOERROR && if_table) {
+			//wcout << "Num: "<< if_table->NumEntries << endl;
+			for (i = 0; i < if_table->NumEntries; i++) {
+				if ((if_table->Table[i].Type == IF_TYPE_ETHERNET_CSMACD) || (if_table->Table[i].Type == IF_TYPE_IEEE80211)) {
+					if (if_table->Table[i].InterfaceAndOperStatusFlags.HardwareInterface &&
+						if_table->Table[i].InterfaceAndOperStatusFlags.ConnectorPresent)
+					{
+						if (if_table->Table[i].Type == IF_TYPE_ETHERNET_CSMACD)
+							wcout << L"LAN  ";
+						if (if_table->Table[i].Type == IF_TYPE_IEEE80211)
+							wcout << L"WLAN ";
+						//ConnectorPresent : physical network adapter.
+						wcout << L": " << if_table->Table[i].InterfaceIndex;
+						if (UuidToStringW(&if_table->Table[i].InterfaceGuid, &strGuid) == RPC_S_OK)
+						{
+							//GUID
+							wcout << L" : " << (LPWSTR)strGuid;
+							RpcStringFreeW(&strGuid);
+						}
+						wcout << L" : \"" << if_table->Table[i].Description << L"\"";
+						wcout << L" : \"" << if_table->Table[i].Alias << L"\"";
+						//wcout << "\t = HW ";
+						//if (if_table->Table[i].OperStatus == IfOperStatusUp) {
+							//The interface is up and able to pass packets
+						//	wcout << " UP";
+						//}
+						wcout << endl;
+					}
+				}
+			}
+		}	
+	}
+	__finally
+	{
+		// clean up
+		if (if_table)
+			FreeMibTable(if_table);
+	}
+	PrintErrorMsg(argv[0], dwError);
+	return (dwError);
+}
+
 #define MALLOC(x) HeapAlloc(GetProcessHeap(), 0, (x)) 
 #define FREE(x) HeapFree(GetProcessHeap(), 0, (x))
 
@@ -1553,9 +1619,6 @@ GetInterfaceName(
 	// Declare and initialize variables
 	PIP_INTERFACE_INFO pInfo = NULL;
 	ULONG ulOutBufLen = 0;
-
-	//DWORD dwRetVal = 0;
-	//int iReturn = 1;
 
 	int i;
 	__try
@@ -1581,10 +1644,9 @@ GetInterfaceName(
 		if (dwError == NO_ERROR) {
 			wcout << "Number of Adapters: " <<  pInfo->NumAdapters <<endl;
 			for (i = 0; i < pInfo->NumAdapters; i++) {
-				wcout << "Adapter Index[" << i << "]: " << pInfo->Adapter[i].Index << endl;
-				wcout << "Adapter Name[" << i << "]: " << pInfo->Adapter[i].Name << endl;
+				wcout << "Adapter [" << i << "]: " << pInfo->Adapter[i].Index ;
+				wcout << " : " << pInfo->Adapter[i].Name << endl;
 			}
-			//dwError = ERROR_SUCCESS;
 		}
 		else if (dwError == ERROR_NO_DATA) {
 			wcerr << "There are no network adapters with IPv4 enabled on the local system" << endl;
@@ -2915,6 +2977,7 @@ Version(
 	wcout << VERSION << endl;
 	return ERROR_SUCCESS;
 }
+
 // show help messages
 DWORD
 Help(
@@ -2923,19 +2986,19 @@ Help(
 );
 
 //typedef VOID (*WLSAMPLE_FUNCTION) (int argc, LPWSTR argv[]);
-typedef DWORD (*WLSAMPLE_FUNCTION) (int argc, LPWSTR argv[]);
+typedef DWORD (*WLAN_FUNCTION) (int argc, LPWSTR argv[]);
 
-typedef struct _WLSAMPLE_COMMAND {
+typedef struct _WLAN_COMMAND {
     LPWSTR strCommandName;           // command name
     LPWSTR strShortHand;             // a shorthand for the command
-    WLSAMPLE_FUNCTION Func;         // pointer to the function
+    WLAN_FUNCTION Func;         // pointer to the function
     LPWSTR strHelpMessage;          // help message
     LPWSTR strParameters;           // parameters for the command
     BOOL bRemarks;                  // whether have remarks for the command
     LPWSTR strRemarks;              // remarks
-} WLSAMPLE_COMMAND, *PWLSAMPLE_COMMAND;
+} WLAN_COMMAND, *PWLAN_COMMAND;
 
-WLSAMPLE_COMMAND g_Commands[] = {
+WLAN_COMMAND g_Commands[] = {
     // interface related commands
     {
         L"EnumInterface",
@@ -2947,10 +3010,19 @@ WLSAMPLE_COMMAND g_Commands[] = {
         L""
     },
 	{
+		L"GetInterfaceList",
+		L"gl",
+		GetInterfaceList,
+		L"Enumerate ethernet and wireless interfaces and print the interface information.",
+		L"",
+		FALSE,
+		L""
+	},
+	{
 		L"GetInterfaceName",
 		L"gi",
 		GetInterfaceName,
-		L"Enumerate wireless interfaces and print the basic interface information.",
+		L"Enumerate wireless interfaces and print the basic interface information.\nThis will show not exist interface!!",
 		L"",
 		FALSE,
 		L""
@@ -3165,7 +3237,7 @@ Help(
         wcout << L"wlan " << VERSION << endl;
 		wcout << L" The following commands are available." << endl;
 		wcout << L" Use \"help xyz\" to show the description of command xyz." << endl;
-        for (i=0; i < sizeof(g_Commands)/sizeof(WLSAMPLE_COMMAND); i++)
+        for (i=0; i < sizeof(g_Commands)/sizeof(WLAN_COMMAND); i++)
         {
                 wcout << L"\t"<< g_Commands[i].strCommandName;
                 wcout << L"(" << g_Commands[i].strShortHand << L")" << endl;
@@ -3174,7 +3246,7 @@ Help(
     else if (argc == 2)
     {
         // show the description of a command
-        for (i=0; i < sizeof(g_Commands)/sizeof(WLSAMPLE_COMMAND); i++)
+        for (i=0; i < sizeof(g_Commands)/sizeof(WLAN_COMMAND); i++)
         {
             if (_wcsicmp(argv[1], g_Commands[i].strCommandName) == 0 ||
                     _wcsicmp(argv[1], g_Commands[i].strShortHand) == 0)
@@ -3209,7 +3281,7 @@ ExecuteCommand(
 {
     UINT i = 0;
 
-    for (i=0; i < sizeof(g_Commands)/sizeof(WLSAMPLE_COMMAND); i++)
+    for (i=0; i < sizeof(g_Commands)/sizeof(WLAN_COMMAND); i++)
     {
         // find the command and call the function
         if (_wcsicmp(argv[0], g_Commands[i].strCommandName) == 0 ||
@@ -3220,7 +3292,7 @@ ExecuteCommand(
         }
     }
 
-    if (i == sizeof(g_Commands)/sizeof(WLSAMPLE_COMMAND))
+    if (i == sizeof(g_Commands)/sizeof(WLAN_COMMAND))
     {
         wcerr << L"Invalid command " << argv[0] << L"!" << endl;
 		return ERROR_INVALID_PARAMETER;
