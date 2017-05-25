@@ -35,6 +35,10 @@ Environment:
 #include <vector>
 #include <atlstr.h>
 
+#include <iphlpapi.h>
+#include <iostream>
+#include <algorithm>
+
 // headers needed to use WLAN APIs 
 #include <wlanapi.h>
 
@@ -664,14 +668,12 @@ GetBssidString(
 )
 {
 	static char str[18];
-	UINT i;
-
 	// MAC address
 	snprintf(str, sizeof(str), "%02X:%02X:%02X:%02X:%02X:%02X",
 		Bssid[0], Bssid[1], Bssid[2], Bssid[3], Bssid[4], Bssid[5]);
 	return str;
-
 }
+
 // print BSS info
 VOID 
 PrintBssInfo(
@@ -686,15 +688,6 @@ PrintBssInfo(
     {
         // MAC address
         wcout << L"MAC address: ";
-		/*
-		for (i = 0; i < 6; i++)
-        {
-			wcout << setw(2) << setfill(L'0') << hex << (UINT)pBss->dot11Bssid[i];// << L":";
-			if (i < 5) {
-				wcout << L":";
-			}
-        }
-		*/
 		wcout << GetBssidString(pBss->dot11Bssid);
 		wcout << endl;
         // SSID
@@ -899,7 +892,7 @@ NotificationCallback(
 }
 
 // Register for notification
-VOID 
+DWORD
 RegisterNotification(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -975,11 +968,12 @@ RegisterNotification(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 
 // set profile
-VOID 
+DWORD
 SetProfile(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -1084,10 +1078,11 @@ SetProfile(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // get profile
-VOID 
+DWORD
 GetProfile(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -1151,10 +1146,11 @@ GetProfile(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // delete profile
-VOID 
+DWORD
 DeleteProfile(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -1215,10 +1211,11 @@ DeleteProfile(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // delete profile list (clear all profile)
-VOID
+DWORD
 DeleteProfileList(
 	__in int argc,
 	__in_ecount(argc) LPWSTR argv[]
@@ -1307,10 +1304,11 @@ DeleteProfileList(
 	}
 
 	PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // set profile list
-VOID 
+DWORD
 SetProfileList(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -1367,10 +1365,11 @@ SetProfileList(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // get the list of profiles
-VOID 
+DWORD
 GetProfileList(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -1446,10 +1445,11 @@ GetProfileList(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // enumerate wireless interfaces
-VOID 
+DWORD
 EnumInterface(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -1497,6 +1497,9 @@ EnumInterface(
 				if (UuidToStringW(&pIntfList->InterfaceInfo[i].InterfaceGuid, &strGuid) == RPC_S_OK)
 				{
 					wcout << L"\tGUID: " << (LPWSTR)strGuid ;
+					//std::wstring temp = (LPWSTR)strGuid;
+					//std::transform(temp.begin(), temp.end(), temp.begin(), ::toupper);
+					//wcout << "\t" << temp;
 					RpcStringFreeW(&strGuid);
 				}
 				wcout << L"\tNAME: " << pIntfList->InterfaceInfo[i].strInterfaceDescription << endl;
@@ -1533,10 +1536,66 @@ EnumInterface(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
+#define MALLOC(x) HeapAlloc(GetProcessHeap(), 0, (x)) 
+#define FREE(x) HeapFree(GetProcessHeap(), 0, (x))
+//get network interface name
+DWORD
+GetInterfaceName(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+) 
+{
+	// Declare and initialize variables
+	PIP_INTERFACE_INFO pInfo = NULL;
+	ULONG ulOutBufLen = 0;
+
+	DWORD dwRetVal = 0;
+	int iReturn = 1;
+
+	int i;
+
+	// Make an initial call to GetInterfaceInfo to get
+	// the necessary size in the ulOutBufLen variable
+	dwRetVal = GetInterfaceInfo(NULL, &ulOutBufLen);
+	if (dwRetVal == ERROR_INSUFFICIENT_BUFFER) {
+		pInfo = (IP_INTERFACE_INFO *)MALLOC(ulOutBufLen);
+		if (pInfo == NULL) {
+			printf
+			("Unable to allocate memory needed to call GetInterfaceInfo\n");
+			//return 1;
+		}
+	}
+	// Make a second call to GetInterfaceInfo to get
+	// the actual data we need
+	dwRetVal = GetInterfaceInfo(pInfo, &ulOutBufLen);
+	if (dwRetVal == NO_ERROR) {
+		printf("Number of Adapters: %ld\n\n", pInfo->NumAdapters);
+		for (i = 0; i < pInfo->NumAdapters; i++) {
+			printf("Adapter Index[%d]: %ld\n", i,
+				pInfo->Adapter[i].Index);
+			printf("Adapter Name[%d]: %ws\n\n", i,
+				pInfo->Adapter[i].Name);
+		}
+		iReturn = 0;
+	}
+	else if (dwRetVal == ERROR_NO_DATA) {
+		printf
+		("There are no network adapters with IPv4 enabled on the local system\n");
+		iReturn = 0;
+	}
+	else {
+		printf("GetInterfaceInfo failed with error: %d\n", dwRetVal);
+		iReturn = 1;
+	}
+
+	FREE(pInfo);
+	return (iReturn);
+}
 // get interface capability and supported auth/cipher
-VOID 
+DWORD
 GetInterfaceCapability(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -1672,11 +1731,12 @@ GetInterfaceCapability(
         }
     }
 
-    PrintErrorMsg(argv[0], dwError);
+	PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // query interface connection state
-VOID
+DWORD
 State(
 	__in int argc,
 	__in_ecount(argc) LPWSTR argv[]
@@ -1788,11 +1848,13 @@ State(
 		wcout << L"\" using profile \"" << pCurrentNetwork->strProfileName << "\"" << endl;
 		wcout << L"\tconnection mode: " << GetConnectionModeString(pCurrentNetwork->wlanConnectionMode) << endl;
 		wcout << L"\tBSS type: " << GetBssTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11BssType) << endl;
-		wcout << L"\tBSSID: " << GetBssidString(pCurrentNetwork->wlanAssociationAttributes.dot11Bssid) << endl;
-		wcout << L"\tPHY type: " << GetPhyTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11PhyType) << endl;
-		wcout << L"\tSignal: " << pCurrentNetwork->wlanAssociationAttributes.wlanSignalQuality << endl;
-		wcout << L"\tTx Rate: " << pCurrentNetwork->wlanAssociationAttributes.ulTxRate << endl;
-		wcout << L"\tRx Rate: " << pCurrentNetwork->wlanAssociationAttributes.ulRxRate << endl;
+		if (pCurrentNetwork->isState == wlan_interface_state_connected) {
+			wcout << L"\tBSSID: " << GetBssidString(pCurrentNetwork->wlanAssociationAttributes.dot11Bssid) << endl;
+			wcout << L"\tPHY type: " << GetPhyTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11PhyType) << endl;
+			wcout << L"\tSignal: " << pCurrentNetwork->wlanAssociationAttributes.wlanSignalQuality << L" %" << endl;
+			wcout << L"\tTx Rate: " << pCurrentNetwork->wlanAssociationAttributes.ulTxRate << endl;
+			wcout << L"\tRx Rate: " << pCurrentNetwork->wlanAssociationAttributes.ulRxRate << endl;
+		}
 	}
 	__finally
 	{
@@ -1812,10 +1874,11 @@ State(
 	}
 
 	PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // set the radio state
-VOID 
+DWORD
 SetRadioState(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -1916,10 +1979,11 @@ SetRadioState(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // query basic interface information
-VOID 
+DWORD
 QueryInterface(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -2098,10 +2162,11 @@ QueryInterface(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // scan
-VOID 
+DWORD
 Scan(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -2158,10 +2223,11 @@ Scan(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // get the list of visible wireless networks
-VOID 
+DWORD
 GetVisibleNetworkList(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -2232,10 +2298,11 @@ GetVisibleNetworkList(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // get driver statistics
-VOID 
+DWORD
 GetDriverStatistics(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -2341,10 +2408,11 @@ GetDriverStatistics(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // get BSS list
-VOID 
+DWORD
 GetBssList(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -2429,7 +2497,7 @@ GetBssList(
         {
             __leave;
         }
-
+		wcout << L"\tWlanBssList number: " << pWlanBssList->dwNumberOfItems << endl;
         for (i = 0; i < pWlanBssList->dwNumberOfItems; i++)
         {
             PrintBssInfo(&pWlanBssList->wlanBssEntries[i]);
@@ -2450,11 +2518,12 @@ GetBssList(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 //https://msdn.microsoft.com/en-us/library/windows/desktop/ms706851(v=vs.85).aspx
 // connect to a network using a saved profile
-VOID 
+DWORD
 Connect(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -2590,10 +2659,11 @@ Connect(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // discovery a network without using a saved profile
-VOID 
+DWORD
 Discover(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -2689,10 +2759,11 @@ Discover(
     }
 
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // disconnect from the current network
-VOID 
+DWORD
 Disconnect(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -2746,12 +2817,13 @@ Disconnect(
     }
     
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
 
 // save a temporary profile
 // a temporary profile can be generated by the service for discovery
 // or passed with WlanConnect when the connection mode is wlan_connection_mode_temporary_profile
-VOID 
+DWORD
 SaveTemporaryProfile(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -2809,16 +2881,27 @@ SaveTemporaryProfile(
         }
     }
     PrintErrorMsg(argv[0], dwError);
+	return dwError;
 }
-
+// show version
+DWORD
+Version(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+) 
+{
+	wcout << VERSION << endl;
+	return ERROR_SUCCESS;
+}
 // show help messages
-VOID 
+DWORD
 Help(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
 );
 
-typedef VOID (*WLSAMPLE_FUNCTION) (int argc, LPWSTR argv[]);
+//typedef VOID (*WLSAMPLE_FUNCTION) (int argc, LPWSTR argv[]);
+typedef DWORD (*WLSAMPLE_FUNCTION) (int argc, LPWSTR argv[]);
 
 typedef struct _WLSAMPLE_COMMAND {
     LPWSTR strCommandName;           // command name
@@ -2841,6 +2924,15 @@ WLSAMPLE_COMMAND g_Commands[] = {
         FALSE,
         L""
     },
+	{
+		L"GetInterfaceName",
+		L"gi",
+		GetInterfaceName,
+		L"Enumerate wireless interfaces and print the basic interface information.",
+		L"",
+		FALSE,
+		L""
+	},
     {
         L"GetInterfaceCapability",
         L"gic",
@@ -3016,6 +3108,15 @@ WLSAMPLE_COMMAND g_Commands[] = {
         FALSE,
         L""
     },
+	{
+		L"version",
+		L"ver",
+		Version,
+		L"Print Version.",
+		L"[<command>]",
+		FALSE,
+		L""
+	},
     {
         L"help",
         L"?",
@@ -3028,7 +3129,7 @@ WLSAMPLE_COMMAND g_Commands[] = {
 };
 
 // show help messages
-VOID 
+DWORD
 Help(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -3074,10 +3175,11 @@ Help(
     {
         PrintErrorMsg(argv[0], ERROR_INVALID_PARAMETER);
     }
+	return ERROR_SUCCESS;
 }
 
 // command is stored in the global variable
-void 
+DWORD
 ExecuteCommand(
     __in int argc, 
     __in_ecount(argc) LPWSTR argv[]
@@ -3091,7 +3193,7 @@ ExecuteCommand(
         if (_wcsicmp(argv[0], g_Commands[i].strCommandName) == 0 ||
             _wcsicmp(argv[0], g_Commands[i].strShortHand) == 0)
         {
-            g_Commands[i].Func(argc, argv);
+			return g_Commands[i].Func(argc, argv);
             break;
         }
     }
@@ -3099,7 +3201,9 @@ ExecuteCommand(
     if (i == sizeof(g_Commands)/sizeof(WLSAMPLE_COMMAND))
     {
         wcerr << L"Invalid command " << argv[0] << L"!" << endl;
+		return ERROR_INVALID_PARAMETER;
     }
+	return -1;
 }
 
 // the main program
@@ -3124,9 +3228,9 @@ wmain(
     else
     {
         // don't pass in the first parameter
-        ExecuteCommand(argc-1, argv+1);
+		dwRetCode = ExecuteCommand(argc-1, argv+1);
     }
-
+	wcout << "dwRetCode:" << dwRetCode;
     return dwRetCode;
 }
 
