@@ -1,4 +1,4 @@
-/*++
+﻿/*++
 
 Copyright (c) 2006 Microsoft Corporation
 
@@ -88,7 +88,7 @@ BOOL GetVersion2(OSVERSIONINFOEX* os) {
 		unsigned char* dtc = (unsigned char*)os->szCSDVersion;
 		while (*src)
 			*dtc++ = (unsigned char)*src++;
-		*dtc = '�0';
+		*dtc = '¥0';
 #endif
 
 	}
@@ -1582,8 +1582,8 @@ GetInterfaceList(
 							wcout << L" : " << (LPWSTR)strGuid;
 							RpcStringFreeW(&strGuid);
 						}
-						wcout << L" : \"" << if_table->Table[i].Description << L"\"";
-						wcout << L" : \"" << if_table->Table[i].Alias << L"\"";
+						wcout << L" : " << if_table->Table[i].Description ;
+						wcout << L" : " << if_table->Table[i].Alias ;
 						//wcout << "\t = HW ";
 						//if (if_table->Table[i].OperStatus == IfOperStatusUp) {
 							//The interface is up and able to pass packets
@@ -1607,7 +1607,7 @@ GetInterfaceList(
 
 #define MALLOC(x) HeapAlloc(GetProcessHeap(), 0, (x)) 
 #define FREE(x) HeapFree(GetProcessHeap(), 0, (x))
-
+/*
 //get network interface name
 DWORD
 GetInterfaceName(
@@ -1678,6 +1678,7 @@ GetInterfaceName(
 	PrintErrorMsg(argv[0], dwError);
 	return (dwError);
 }
+*/
 // get interface capability and supported auth/cipher
 DWORD
 GetInterfaceCapability(
@@ -2625,7 +2626,7 @@ Connect(
 	}*/
     __try
     {
-        if (argc != 5)
+        if (argc < 5)
         {
             dwError = ERROR_INVALID_PARAMETER;
             __leave;
@@ -3018,6 +3019,7 @@ WLAN_COMMAND g_Commands[] = {
 		FALSE,
 		L""
 	},
+	/*
 	{
 		L"GetInterfaceName",
 		L"gi",
@@ -3026,7 +3028,7 @@ WLAN_COMMAND g_Commands[] = {
 		L"",
 		FALSE,
 		L""
-	},
+	},*/
     {
         L"GetInterfaceCapability",
         L"gic",
@@ -3096,7 +3098,7 @@ WLAN_COMMAND g_Commands[] = {
         L"SetProfile",
         L"sp",
         SetProfile,
-        L"Save a profile.",
+        L"Set a profile by a xml file.",
         L"<interface GUID> <profile XML file name>",
         TRUE,
         L"Use EnumInterface (ei) command to get the GUID of an interface."
