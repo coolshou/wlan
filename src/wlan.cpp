@@ -39,7 +39,9 @@ Environment:
 #include <netioapi.h> //MIB_IF_TABLE2
 #include <iphlpapi.h>
 #include <iostream>
+#include <sstream>
 #include <algorithm>
+#include <string.h>
 
 // headers needed to use WLAN APIs 
 #include <wlanapi.h>
@@ -973,7 +975,184 @@ RegisterNotification(
 	return dwError;
 }
 
+// Create Profile
+//<interface GUID> <SSID> <OPEN|WEP|SHARED|WPAPSK|WPA2PSK> <KEY> <WEP|TKIP|AES>
+DWORD
+CreateProfile(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+)
+{
+	DWORD dwError = ERROR_SUCCESS;
+	DWORD dwReason;
+	HANDLE hClient = NULL;
+	GUID guidIntf;
+	DOT11_SSID dot11Ssid = { 0 };
+	PDOT11_SSID pDot11Ssid = NULL;
+	LPWSTR ssid;
 
+	LPWSTR authType;
+	LPWSTR key;
+
+	LPWSTR cipherType;
+	//LPCWSTR profileXml;
+	wstring profileXml = L"";
+
+	// __try and __leave cannot be used here
+	do
+	{
+		if (argc < 4)
+		{
+			dwError = ERROR_INVALID_PARAMETER;
+			break;
+		}
+		// get the interface GUID
+		if (UuidFromString((RPC_WSTR)argv[1], &guidIntf) != RPC_S_OK)
+		{
+			wcerr << L"Invalid GUID " << argv[1] << endl;
+			dwError = ERROR_INVALID_PARAMETER;
+			break;
+		}
+		/*
+		// get SSID
+		if ((dwError = StringWToSsid(argv[2], &dot11Ssid)) != ERROR_SUCCESS)
+		{
+			break;
+		}
+		pDot11Ssid = &dot11Ssid;
+		*/
+		ssid = argv[2];
+		wstring wSsid(ssid);
+		//convert to HEX string
+		std::wstringstream hSsid;
+		for (int i = 0;i<wSsid.length();i++) {
+			hSsid << std::hex << (int)wSsid.at(i);
+		}
+		//
+		authType = argv[3];
+
+		if (argc >= 4) {
+			key = argv[4];
+		}
+		if (argc >= 5) {
+			cipherType = argv[5];
+		}
+
+		profileXml += L"<?xml version=\"1.0\"?>";
+		profileXml += L"<WLANProfile xmlns=\"http://www.microsoft.com/networking/WLAN/profile/v1\">";
+		profileXml += L"<name>"+ wSsid + L"</name>";
+		profileXml += L"<SSIDConfig>";
+		profileXml += L"<SSID>";
+		profileXml += L"<hex>" + hSsid.str() + L"</hex>";
+		profileXml += L"<name>" + wSsid + L"</name>";
+		profileXml += L"</SSID>";
+		profileXml += L"<nonBroadcast>true</nonBroadcast>"; //TODO:
+		profileXml += L"</SSIDConfig>";
+		profileXml += L"<connectionType>ESS</connectionType>";
+		profileXml += L"<connectionMode>auto</connectionMode>"; //TODO:
+		profileXml += L"<autoSwitch>false</autoSwitch>"; //TODO:
+		profileXml += L"<MSM><security>";
+
+		if ((wcscmp(authType, L"OPEN") == 0) || (wcscmp(authType, L"WEP") == 0)) {
+			profileXml += L"<authEncryption>";
+			profileXml += L"<authentication>open</authentication>";
+			profileXml += L"<encryption>";
+			if (wcscmp(authType, L"OPEN") == 0) {
+				profileXml += L"none";
+			}
+			if (wcscmp(authType, L"WEP") == 0) {
+				profileXml += L"WEP";
+			}
+			profileXml += L"</encryption>";
+			profileXml += L"<useOneX>false</useOneX>";
+			profileXml += L"</authEncryption>";
+			if (wcscmp(authType, L"WEP") == 0) {
+				profileXml += L"<sharedKey>";
+				profileXml += L"<keyType>networkKey</keyType>";
+				profileXml += L"<protected>false</protected>";
+				wstring wKey(key);
+				profileXml += L"<keyMaterial>" + wKey + L"</keyMaterial>";
+				profileXml += L"</sharedKey>";
+				//profileXml += L"<keyIndex>0</keyIndex>";
+			}
+
+		}	
+		else if ((wcscmp(authType, L"WPAPSK") == 0)|| (wcscmp(authType, L"WPA2PSK") == 0)) {
+			profileXml += L"<authEncryption>";
+			profileXml += L"<authentication>";
+			if (wcscmp(authType, L"WPAPSK") == 0) {
+				profileXml += L"WPAPSK";
+			}
+			if (wcscmp(authType, L"WPA2PSK") == 0) {
+				profileXml += L"WPA2PSK";
+			}
+			profileXml += L"</authentication>";
+			profileXml += L"<encryption>";
+			if (wcscmp(cipherType, L"TKIP") == 0) {
+				profileXml += L"TKIP";
+			}
+			if (wcscmp(cipherType, L"AES") == 0) {
+				profileXml += L"AES";
+			}
+			profileXml += L"</encryption>";
+			profileXml += L"<useOneX>false</useOneX>";
+			profileXml += L"</authEncryption>";
+			profileXml += L"<sharedKey>";
+			profileXml += L"<keyType>passPhrase</keyType>";
+			profileXml += L"<protected>false</protected>";
+			wstring wKey(key);
+			profileXml += L"<keyMaterial>" + wKey + L"</keyMaterial>";
+			profileXml += L"</sharedKey>";
+		}
+		else {
+			wcerr << L"Invalid authentication type: " << authType << endl;
+			dwError = ERROR_INVALID_PARAMETER;
+			break;
+		}
+		profileXml += L"</security></MSM>";
+		profileXml += L"</WLANProfile>";
+		/*
+		wcout << "=profile================================" << endl;
+		wcout << profileXml.c_str() << endl;
+		wcout << "========================================" << endl;
+		*/
+		// open a handle to the service
+		if ((dwError = OpenHandleAndCheckVersion(
+			&hClient
+		)) != ERROR_SUCCESS)
+		{
+			break;
+		}
+		// set profile
+		dwError = WlanSetProfile(
+			hClient,
+			&guidIntf,
+			0,          // no flags for the profile 
+			profileXml.c_str(),
+			NULL,       // use the default ACL
+			TRUE,		// overwrite a profile if it already exists
+			NULL,       // reserved
+			&dwReason
+		);
+		if (dwError == ERROR_BAD_PROFILE)
+		{
+			wcout << L"The profile is bad.";
+			PrintReason(dwReason);
+		}
+	} while (FALSE);
+	 
+	// clean up
+	if (hClient != NULL)
+	{
+		WlanCloseHandle(
+			hClient,
+			NULL            // reserved
+		);
+	}
+	
+	PrintErrorMsg(argv[0], dwError);
+	return dwError;
+}
 // set profile
 DWORD
 SetProfile(
@@ -3012,23 +3191,13 @@ WLAN_COMMAND g_Commands[] = {
     },
 	{
 		L"GetInterfaceList",
-		L"gl",
+		L"gi",
 		GetInterfaceList,
 		L"Enumerate ethernet and wireless interfaces and print the interface information.",
 		L"",
 		FALSE,
 		L""
 	},
-	/*
-	{
-		L"GetInterfaceName",
-		L"gi",
-		GetInterfaceName,
-		L"Enumerate wireless interfaces and print the basic interface information.\nThis will show not exist interface!!",
-		L"",
-		FALSE,
-		L""
-	},*/
     {
         L"GetInterfaceCapability",
         L"gic",
@@ -3094,6 +3263,15 @@ WLAN_COMMAND g_Commands[] = {
         L"Use EnumInterface (ei) command to get the GUID of an interface."
     },
     // profile releated commands
+	{
+		L"CreateProfile",
+		L"cp",
+		CreateProfile,
+		L"Create a profile by a SSID and security.",
+		L"<interface GUID> <SSID> <OPEN|WEP|SHARED|WPAPSK|WPA2PSK> <KEY> <WEP|TKIP|AES>",
+		TRUE,
+		L"Use EnumInterface (ei) command to get the GUID of an interface."
+	},
     {
         L"SetProfile",
         L"sp",
