@@ -976,7 +976,7 @@ RegisterNotification(
 }
 
 // Create Profile
-//<interface GUID> <SSID> <OPEN|WEP|SHARED|WPAPSK|WPA2PSK> <KEY> <WEP|TKIP|AES>
+//<interface GUID> <SSID> <OPEN|WEP|SHARED|WPAPSK|WPA2PSK> <WEP|TKIP|AES> <KEY>
 DWORD
 CreateProfile(
 	__in int argc,
@@ -1013,29 +1013,23 @@ CreateProfile(
 			dwError = ERROR_INVALID_PARAMETER;
 			break;
 		}
-		/*
-		// get SSID
-		if ((dwError = StringWToSsid(argv[2], &dot11Ssid)) != ERROR_SUCCESS)
-		{
-			break;
-		}
-		pDot11Ssid = &dot11Ssid;
-		*/
+		//TODO: check SSID length
 		ssid = argv[2];
 		wstring wSsid(ssid);
 		//convert to HEX string
 		std::wstringstream hSsid;
-		for (int i = 0;i<wSsid.length();i++) {
+		for (int i = 0;i< wSsid.length();i++) {
 			hSsid << std::hex << (int)wSsid.at(i);
 		}
 		//
 		authType = argv[3];
 
 		if (argc >= 4) {
-			key = argv[4];
+			cipherType = argv[4];
 		}
+
 		if (argc >= 5) {
-			cipherType = argv[5];
+			key = argv[5];
 		}
 
 		profileXml += L"<?xml version=\"1.0\"?>";
@@ -1071,6 +1065,7 @@ CreateProfile(
 				profileXml += L"<keyType>networkKey</keyType>";
 				profileXml += L"<protected>false</protected>";
 				wstring wKey(key);
+				//TODO: key length check: 5, 10, 13, 26
 				profileXml += L"<keyMaterial>" + wKey + L"</keyMaterial>";
 				profileXml += L"</sharedKey>";
 				//profileXml += L"<keyIndex>0</keyIndex>";
@@ -1101,6 +1096,7 @@ CreateProfile(
 			profileXml += L"<keyType>passPhrase</keyType>";
 			profileXml += L"<protected>false</protected>";
 			wstring wKey(key);
+			//TODO: key length check: 8~64
 			profileXml += L"<keyMaterial>" + wKey + L"</keyMaterial>";
 			profileXml += L"</sharedKey>";
 		}
@@ -1111,11 +1107,11 @@ CreateProfile(
 		}
 		profileXml += L"</security></MSM>";
 		profileXml += L"</WLANProfile>";
-		/*
-		wcout << "=profile================================" << endl;
-		wcout << profileXml.c_str() << endl;
-		wcout << "========================================" << endl;
-		*/
+		
+		//wcout << "=profile================================" << endl;
+		//wcout << profileXml.c_str() << endl;
+		//wcout << "========================================" << endl;
+		
 		// open a handle to the service
 		if ((dwError = OpenHandleAndCheckVersion(
 			&hClient
@@ -1273,7 +1269,7 @@ GetProfile(
     HANDLE hClient = NULL;
     PWSTR strXml;
     GUID guidIntf;
-
+	DWORD dwFlags = WLAN_PROFILE_GET_PLAINTEXT_KEY;
     __try
     {
         if (argc != 3)
@@ -1305,7 +1301,7 @@ GetProfile(
                             argv[2],    // profile name
                             NULL,       // reserved
                             &strXml,    // XML string of the profile
-                            NULL,       // not interested in the profile flags
+							&dwFlags,       // retrieve the plain text key from a wireless profile
                             NULL        // don't care about ACL
                             )) == ERROR_SUCCESS)
         {
@@ -3268,7 +3264,7 @@ WLAN_COMMAND g_Commands[] = {
 		L"cp",
 		CreateProfile,
 		L"Create a profile by a SSID and security.",
-		L"<interface GUID> <SSID> <OPEN|WEP|SHARED|WPAPSK|WPA2PSK> <KEY> <WEP|TKIP|AES>",
+		L"<interface GUID> <SSID> <OPEN|WEP|SHARED|WPAPSK|WPA2PSK> <WEP|TKIP|AES> <KEY>",
 		TRUE,
 		L"Use EnumInterface (ei) command to get the GUID of an interface."
 	},
@@ -3504,7 +3500,7 @@ wmain(
         // don't pass in the first parameter
 		dwRetCode = ExecuteCommand(argc-1, argv+1);
     }
-	wcout << "dwRetCode:" << dwRetCode;
+	//wcout << "dwRetCode:" << dwRetCode;
     return dwRetCode;
 }
 
