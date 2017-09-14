@@ -43,9 +43,14 @@ Environment:
 #include <algorithm>
 #include <string.h>
 
+#include <setupapi.h> //EnableNetDevice
+//#include <netcfgx.h>
+#include <devguid.h>
+#include <Ndisguid.h> //GUID_DEVINTERFACE_NET
 // headers needed to use WLAN APIs 
 #include <wlanapi.h>
 
+#include "CommandError.h"				// CWin32ErrToWString
 #include "version.h"
 
 using namespace std;
@@ -690,6 +695,26 @@ PrintBssInfo(
     
     if (pBss != NULL)
     {
+		//col mode, use \t to sepelate
+		//MAC SSID CenterFrequency RSSI LinkQuality phyType
+		wcout << GetBssidString(pBss->dot11Bssid);
+		wcout << L"\t";
+		wcout << SsidToStringW(strSsid, sizeof(strSsid) / sizeof(WCHAR), &pBss->dot11Ssid);
+		wcout << L"\t";
+		wcout << pBss->ulChCenterFrequency/1000;
+		wcout << L"\t";
+		wcout << pBss->lRssi;
+		wcout << L"\t";
+		wcout << pBss->uLinkQuality;
+		wcout << L"\t";
+		wcout << GetPhyTypeString(pBss->dot11BssPhyType);
+		/*
+		//https://msdn.microsoft.com/en-us/library/windows/desktop/aa370026(v=vs.85).aspx
+		//wcout << pBss->wlanRateSet;
+		*/
+		wcout << L"\t";
+		wcout << endl;
+		if (0) {
         // MAC address
         wcout << L"MAC address: ";
 		wcout << GetBssidString(pBss->dot11Bssid);
@@ -718,6 +743,7 @@ PrintBssInfo(
 			}
 		}
         wcout << endl;
+    }
     }
     
 }
@@ -1716,6 +1742,191 @@ EnumInterface(
 	return dwError;
 }
 
+//can not get disable net device
+vector<MIB_IF_ROW2>* getDevices(NDIS_PHYSICAL_MEDIUM type)
+{
+	vector<MIB_IF_ROW2> *v = new vector<MIB_IF_ROW2>();
+	PMIB_IF_TABLE2 table = NULL;
+	if (GetIfTable2Ex(MibIfTableRaw, &table) == NOERROR && table)
+	{
+		UINT32 i = 0;
+		for (; i < table->NumEntries; i++)
+		{
+			MIB_IF_ROW2 row;
+
+			ZeroMemory(&row, sizeof(MIB_IF_ROW2));
+			row.InterfaceIndex = i;
+			if (GetIfEntry2(&row) == NOERROR)
+			{
+				if (row.PhysicalMediumType == type)
+				{
+					v->push_back(row);
+				}
+			}
+		}
+		FreeMibTable(table);
+	}
+	return v;
+}
+
+
+//This function will require Administrator
+void EnableNetDevice(bool aState, int index)
+{
+	HDEVINFO NetPnPHandle;
+	SP_PROPCHANGE_PARAMS PCHP;
+	SP_DEVINFO_DATA DeviceData;
+	RPC_WSTR strGuid = NULL;
+
+
+	NetPnPHandle = SetupDiGetClassDevs(&GUID_DEVCLASS_NET, 0, 0, DIGCF_PRESENT);
+	//NetPnPHandle = SetupDiGetClassDevs(&GUID_DEVCLASS_NET, 0, 0, DIGCF_DEVICEINTERFACE);
+	//GUID_DEVCLASS_NET
+	//GUID_DEVINTERFACE_NET
+	if (NetPnPHandle == INVALID_HANDLE_VALUE)
+	{
+		return;
+	}
+
+	DeviceData.cbSize = sizeof(SP_DEVINFO_DATA);
+	if (SetupDiEnumDeviceInfo(NetPnPHandle, index, &DeviceData)) {
+		PCHP.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
+		wchar_t  szDesc[MAX_PATH] = { 0 };
+		if (SetupDiGetClassDescription(&DeviceData.ClassGuid, szDesc, MAX_PATH, NULL)) {
+			wcout << index << L": ClassDescription: " << szDesc << endl;
+		}
+		if (UuidToString(&DeviceData.ClassGuid, &strGuid) == RPC_S_OK)
+		{
+			wcout << index << L": ClassGuid: " << strGuid << endl;
+		}
+		wchar_t  szFriendlyName[MAX_PATH] = { 0 };
+		if (SetupDiGetDeviceRegistryProperty(NetPnPHandle, &DeviceData,
+			SPDRP_FRIENDLYNAME, 0L, (PBYTE)szFriendlyName, 2048, 0)) {
+			wcout << index << L": FriendlyName: " << szFriendlyName << endl;
+		}
+		//why we need to call it here
+		//SetupDiSetClassInstallParams(NetPnPHandle, &DeviceData, &PCHP.ClassInstallHeader, sizeof(SP_PROPCHANGE_PARAMS));
+		
+		PCHP.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
+		PCHP.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;
+		PCHP.HwProfile = 0;
+		PCHP.Scope = DICS_FLAG_CONFIGSPECIFIC;
+		if (aState) PCHP.StateChange = DICS_ENABLE;
+		else  PCHP.StateChange = DICS_DISABLE;
+		SetupDiSetClassInstallParams(NetPnPHandle, &DeviceData, &PCHP.ClassInstallHeader, sizeof(SP_PROPCHANGE_PARAMS));
+		if (SetupDiCallClassInstaller(DIF_PROPERTYCHANGE, NetPnPHandle, &DeviceData)) {
+			wcout << L"EnableNetDevice: " << index << L" : " << aState << endl;
+		}
+		else {
+			DWORD dwErr = GetLastError();
+			std::wstring szErr = CWin32ErrToWString()(dwErr);
+			wcout << L"ERROR: " << szErr << endl;
+		}
+			
+	}
+	else {
+		wcout << L"SetupDiEnumDeviceInfo not found device: " << index << endl;
+	}
+	//DeviceData.cbSize = sizeof(SP_DEVINFO_DATA);
+	SetupDiDestroyDeviceInfoList(NetPnPHandle);
+}
+
+DWORD
+DisableInterface(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+)
+{
+	DWORD dwError = ERROR_SUCCESS;
+	LPWSTR sIdx;
+	int idx;
+	__try
+	{
+		if (argc != 2)
+		{
+			dwError = ERROR_INVALID_PARAMETER;
+			__leave;
+		}
+		sIdx = argv[1];
+		idx = _wtoi(sIdx);
+		EnableNetDevice(false, idx);
+	}
+	__finally
+	{
+		//
+	}
+
+	PrintErrorMsg(argv[0], dwError);
+	return dwError;
+}
+
+DWORD
+EnableInterface(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+)
+{
+	DWORD dwError = ERROR_SUCCESS;
+	LPWSTR sIdx;
+	int idx;
+	__try
+	{
+		if (argc != 2)
+		{
+			dwError = ERROR_INVALID_PARAMETER;
+			__leave;
+		}
+		sIdx = argv[1];
+		idx = _wtoi(sIdx);
+		EnableNetDevice(true, idx);
+	}
+	__finally
+	{
+
+	}
+
+	PrintErrorMsg(argv[0], dwError);
+	return dwError;
+}
+
+
+// TODO: GetDeviceList
+DWORD
+GetDeviceList(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+)
+{
+	DWORD dwError = ERROR_SUCCESS;
+	RPC_WSTR strGuid = NULL;
+
+	vector<MIB_IF_ROW2>* wlan = getDevices(NdisPhysicalMediumNative802_11); //WLAN adapters
+//see https://msdn.microsoft.com/en-us/library/windows/desktop/aa814491(v=vs.85).aspx, "PhysicalMediumType" for a full list
+	for (auto &row : *wlan)
+	{
+		//do some additional filtering, this needs to be changed for non-WLAN
+		if (row.MediaType == NdisMedium802_3 ) {
+			if (UuidToStringW(&row.InterfaceGuid, &strGuid) == RPC_S_OK) {
+				wcout << L"GUID: " << strGuid;
+				wcout << L" Desc:" << row.Description;
+				wcout << L" alias:" << row.Alias;
+			}
+		}
+		
+		if (row.TunnelType == TUNNEL_TYPE_NONE &&
+			row.AccessType != NET_IF_ACCESS_LOOPBACK &&
+			row.Type == IF_TYPE_IEEE80211 &&
+			row.InterfaceAndOperStatusFlags.HardwareInterface == TRUE)
+		{
+			//HERE BE DRAGONS!
+			wcout << "  *";
+		}
+		wcout << endl;
+	}
+	PrintErrorMsg(argv[0], dwError);
+	return (dwError);
+}
+
 DWORD
 GetInterfaceList(
 	__in int argc,
@@ -1736,7 +1947,7 @@ GetInterfaceList(
 			__leave;
 		}
 		// Retrieve list of network interfaces
-		//vista above only
+		//vista above only, only enabled NIC
 		//wcout << "GetIfTable2" << endl;
 		if (GetIfTable2(&if_table) == NOERROR && if_table) {
 			//wcout << "Num: "<< if_table->NumEntries << endl;
@@ -1787,10 +1998,12 @@ GetInterfaceList(
 	return (dwError);
 }
 
-#define MALLOC(x) HeapAlloc(GetProcessHeap(), 0, (x)) 
-#define FREE(x) HeapFree(GetProcessHeap(), 0, (x))
 /*
 //get network interface name
+
+#define MALLOC(x) HeapAlloc(GetProcessHeap(), 0, (x)) 
+#define FREE(x) HeapFree(GetProcessHeap(), 0, (x))
+
 DWORD
 GetInterfaceName(
 	__in int argc,
@@ -2764,12 +2977,12 @@ GetBssList(
         {
             __leave;
         }
-		wcout << L"\tWlanBssList number: " << pWlanBssList->dwNumberOfItems << endl;
+		//wcout << L"\tWlanBssList number: " << pWlanBssList->dwNumberOfItems << endl;
         for (i = 0; i < pWlanBssList->dwNumberOfItems; i++)
         {
             PrintBssInfo(&pWlanBssList->wlanBssEntries[i]);
         }
-            
+		wcout << L"(Total: " << pWlanBssList->dwNumberOfItems << L")";
         WlanFreeMemory(pWlanBssList);
     }
     __finally
@@ -3193,6 +3406,15 @@ WLAN_COMMAND g_Commands[] = {
         L""
     },
 	{
+		L"GetDeviceList",
+		L"gd",
+		GetDeviceList,
+		L"Enumerate ethernet and wireless interfaces and print the interface information.",
+		L"",
+		FALSE,
+		L""
+	},
+	{
 		L"GetInterfaceList",
 		L"gi",
 		GetInterfaceList,
@@ -3338,6 +3560,27 @@ WLAN_COMMAND g_Commands[] = {
         TRUE,
         L"Use EnumInterface (ei) command to get the GUID of an interface."
     },
+/*
+	//Disable/enable Interface
+	{
+		L"DisableInterface",
+		L"di",
+		DisableInterface,
+		L"Disable network Interface. (require Administrator)",
+		L"<interface Index> ",
+		TRUE,
+		L"Use GetInterfaceList (gi) command to get the Index of an interface."
+	},
+	{
+		L"EnableInterface",
+		L"eni",
+		EnableInterface,
+		L"Enable network Interface. (require Administrator)",
+		L"<interface Index> ",
+		TRUE,
+		L"Use GetInterfaceList (gi) command to get the Index of an interface."
+	},
+*/
     // connection related commands
     {
         L"Connect",
