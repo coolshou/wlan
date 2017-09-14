@@ -1018,7 +1018,7 @@ CreateProfile(
 		wstring wSsid(ssid);
 		//convert to HEX string
 		std::wstringstream hSsid;
-		for (int i = 0;i< wSsid.length();i++) {
+		for (u_int i = 0;i< wSsid.length();i++) {
 			hSsid << std::hex << (int)wSsid.at(i);
 		}
 		//
@@ -1742,8 +1742,10 @@ GetInterfaceList(
 			//wcout << "Num: "<< if_table->NumEntries << endl;
 			for (i = 0; i < if_table->NumEntries; i++) {
 				if ((if_table->Table[i].Type == IF_TYPE_ETHERNET_CSMACD) || (if_table->Table[i].Type == IF_TYPE_IEEE80211)) {
-					if (if_table->Table[i].InterfaceAndOperStatusFlags.HardwareInterface &&
-						if_table->Table[i].InterfaceAndOperStatusFlags.ConnectorPresent)
+					if (if_table->Table[i].InterfaceAndOperStatusFlags.HardwareInterface 
+						&& (if_table->Table[i].OperStatus != 6)
+						//&& if_table->Table[i].InterfaceAndOperStatusFlags.ConnectorPresent
+						)
 					{
 						if (if_table->Table[i].Type == IF_TYPE_ETHERNET_CSMACD)
 							wcout << L"LAN  ";
@@ -1759,6 +1761,11 @@ GetInterfaceList(
 						}
 						wcout << L" : " << if_table->Table[i].Description ;
 						wcout << L" : " << if_table->Table[i].Alias ;
+						//AdminStatus= 1 : interface is up, 2 : disable, 3 : testing mode
+						wcout << L" : " << if_table->Table[i].AdminStatus;
+						//show device exist or not/ disable will be 0
+						//wcout << L" : " << if_table->Table[i].InterfaceAndOperStatusFlags.ConnectorPresent;
+						//wcout << L" : " << if_table->Table[i].OperStatus;
 						//wcout << "\t = HW ";
 						//if (if_table->Table[i].OperStatus == IfOperStatusUp) {
 							//The interface is up and able to pass packets
