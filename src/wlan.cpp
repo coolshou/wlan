@@ -1,13 +1,8 @@
 ﻿/*++
-
 Copyright (c) 2006 Microsoft Corporation
-
 Module Name:
-
     wlan.cpp
-
 Abstract:
-
     Use WLAN APIs to control wireless device
 
 Date:
@@ -16,9 +11,7 @@ Date:
 	05/02/2017  add 11n/11ac
 
 Environment:
-
    User mode only
-
 --*/
 // define this flag for COM
 #define _WIN32_DCOM
@@ -61,6 +54,8 @@ using namespace std;
         (HRESULT_FACILITY(hr) == FACILITY_WIN32 ? HRESULT_CODE(hr) : (hr)))
 
 DWORD OSMajor;
+//HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}
+#define REG_NIC_PATH L"SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\"
 
 // os version
 typedef void (WINAPI *RtlGetVersion_FUNC)(OSVERSIONINFOEXW*);
@@ -105,7 +100,70 @@ BOOL GetVersion2(OSVERSIONINFOEX* os) {
 	return TRUE;
 }
 
+//
+// Register functions
+//
 
+//SetKeyData(HKEY_LOCAL_MACHINE, “Software\\Microsoft\\Windows\\CurrentVersion\\Run”, REG_SZ, “ApplicationName”, “C:\\ApplicationPath\\ApplicationName.exe”, strlen(“C:\\ApplicationPath\\ApplicationName.exe”));
+int 
+SetKeyData(HKEY hRootKey, LPCWSTR subKey, DWORD dwType, LPCWSTR value, LPBYTE data, DWORD cbData)
+{
+    HKEY hKey;
+    int rc;
+    if(RegCreateKey(hRootKey, subKey, &hKey) != ERROR_SUCCESS)
+        return 0;
+    //Require administrator right to read/write register key
+    rc = RegSetValueEx(hKey, value, 0, dwType, data, cbData);
+    if( rc != ERROR_SUCCESS)
+    {
+        RegCloseKey(hKey);
+        return rc;
+    }
+    RegCloseKey(hKey);
+    return 1;
+}
+//GetKeyData(HKEY_LOCAL_MACHINE, “Software\\Microsoft\\Windows\\CurrentVersion\\Run”, “ApplicationName”, storeHere, strlen(storeHere));
+int GetKeyData(HKEY hRootKey, LPCWSTR subKey, LPCWSTR value, LPBYTE data, DWORD cbData)
+{
+    HKEY hKey;
+    if(RegOpenKeyEx(hRootKey, subKey, 0, KEY_QUERY_VALUE, &hKey) != ERROR_SUCCESS)
+        return 0;
+    if(RegQueryValueEx(hKey, value, NULL, NULL, data, &cbData) != ERROR_SUCCESS)
+    {
+        RegCloseKey(hKey);
+        return 0;
+    }
+    RegCloseKey(hKey);
+    return 1;
+}
+//
+#define BYTES_PER_DWORD 4
+void DwordsToBytesArray(const DWORD *dwIn, BYTE *bOut, const UINT dwCount,
+    const UINT bCount){
+  UINT i = 0, j = 0, k = 0, l = 0;
+  BYTE bBuff[BYTES_PER_DWORD];
+  
+  for(i = 0; i < dwCount; i++){
+    *(DWORD*)bBuff = dwIn[i];
+    for(k = BYTES_PER_DWORD; k > 0; k--){
+      if(j < bCount){
+        bOut[j++] = bBuff[k - 1];
+      }
+      else{
+        break;
+      }
+    }
+  }
+}
+
+void BytesArrayToString(const BYTE *bIn, char *strOut, const UINT bLen)
+{
+  UINT i = 0;
+  for(i = 0; i < bLen; i++){
+    strOut[i] = bIn[i];
+  }
+  strOut[bLen] = '\0';
+}
 //
 // Utility functions
 //
@@ -1905,23 +1963,27 @@ GetDeviceList(
 	for (auto &row : *wlan)
 	{
 		//do some additional filtering, this needs to be changed for non-WLAN
-		if (row.MediaType == NdisMedium802_3 ) {
-			if (UuidToStringW(&row.InterfaceGuid, &strGuid) == RPC_S_OK) {
-				wcout << L"GUID: " << strGuid;
-				wcout << L" Desc:" << row.Description;
-				wcout << L" alias:" << row.Alias;
+		if ((row.PhysicalMediumType == NdisPhysicalMediumNative802_11)) {
+      if (row.InterfaceAndOperStatusFlags.FilterInterface == false) {
+        //if (UuidToStringW(&row.InterfaceGuid, &strGuid) == RPC_S_OK) {
+        if (UuidToStringW(&row.InterfaceGuid, &strGuid) == RPC_S_OK) {
+          wcout << row.InterfaceIndex;
+          wcout << L" , GUID: " << strGuid;
+          wcout << L" , Desc: " << row.Description;
+          wcout << L" , alias: " << row.Alias;
+          wcout << endl;
+				}
 			}
 		}
-		
+		/*
 		if (row.TunnelType == TUNNEL_TYPE_NONE &&
 			row.AccessType != NET_IF_ACCESS_LOOPBACK &&
 			row.Type == IF_TYPE_IEEE80211 &&
 			row.InterfaceAndOperStatusFlags.HardwareInterface == TRUE)
 		{
 			//HERE BE DRAGONS!
-			wcout << "  *";
-		}
-		wcout << endl;
+			//wcout << "  *";
+		}*/
 	}
 	PrintErrorMsg(argv[0], dwError);
 	return (dwError);
@@ -2215,6 +2277,49 @@ GetInterfaceCapability(
 	return dwError;
 }
 
+DWORD
+GetInterfaceIndex(
+    __in GUID guid
+)
+{
+	DWORD dwError = -1;
+	//GUID guidIntf;
+	int if_type = 0;
+	PMIB_IF_TABLE2 if_table = NULL;
+	unsigned long size = 0;
+	unsigned int i;
+	RPC_WSTR strGuid = NULL;
+	
+	__try
+	{
+		// Retrieve list of network interfaces
+		//vista above only, only enabled NIC
+		if (GetIfTable2(&if_table) == NOERROR && if_table) {
+			for (i = 0; i < if_table->NumEntries; i++) {
+				if ((if_table->Table[i].Type == IF_TYPE_ETHERNET_CSMACD) || (if_table->Table[i].Type == IF_TYPE_IEEE80211)) {
+					if (if_table->Table[i].InterfaceAndOperStatusFlags.HardwareInterface 
+						&& (if_table->Table[i].OperStatus != 6)
+						)
+					{
+						if (if_table->Table[i].InterfaceGuid == guid)
+						{
+                //wcout << L"interface index: " << if_table->Table[i].InterfaceIndex << endl;
+                dwError = if_table->Table[i].InterfaceIndex;
+                break;
+						}
+					}
+				}
+			}
+		}
+	}
+	__finally
+	{
+		// clean up
+		if (if_table)
+			FreeMibTable(if_table);
+	}
+	return (dwError);
+}
 // query interface connection state
 DWORD
 State(
@@ -3374,6 +3479,17 @@ Version(
 	return ERROR_SUCCESS;
 }
 
+//register
+DWORD
+GetReg(
+    __in int argc, 
+    __in_ecount(argc) LPWSTR argv[]
+);
+DWORD
+SetReg(
+    __in int argc, 
+    __in_ecount(argc) LPWSTR argv[]
+);
 // show help messages
 DWORD
 Help(
@@ -3618,6 +3734,26 @@ WLAN_COMMAND g_Commands[] = {
 		TRUE,
 		L"Use EnumInterface (ei) command to get the GUID of an interface."
 	},
+	//register command
+  {
+      L"GetRegkeyValue",
+      L"gr",
+      GetReg,
+      L"Get interface reg key's value.",
+      L"<interface GUID> regkey",
+      TRUE,
+      L"Use EnumInterface (ei) command to get the GUID of an interface."
+  },
+  {
+      L"SetRegkeyValue",
+      L"sr",
+      SetReg,
+      L"Set interface reg key with value.",
+      L"<interface GUID> regkey value",
+      TRUE,
+      L"Use EnumInterface (ei) command to get the GUID of an interface."
+  },
+
     // other commands
     {
         L"RegisterNotif",
@@ -3648,6 +3784,116 @@ WLAN_COMMAND g_Commands[] = {
     }
 };
 
+DWORD
+GetReg(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+)
+{
+	DWORD dwError = ERROR_SUCCESS;
+	GUID guidIntf;
+	LPCWSTR regkey;
+	TCHAR regkeyValue[2] = {0};
+  DWORD regkeyValueSize = sizeof(regkeyValue);
+	LPWSTR regpat=0;
+	DWORD idx;
+  int rc=0;
+  
+  if (argc != 3)
+  {
+    dwError = ERROR_INVALID_PARAMETER;
+    //__leave;
+  } else {
+    // get the interface GUID
+    if (UuidFromString((RPC_WSTR)argv[1], &guidIntf) != RPC_S_OK)
+    {
+      wcerr << L"Invalid GUID " << argv[1] << endl;
+      dwError = ERROR_INVALID_PARAMETER;
+      //__leave;
+    } else {
+      // get reg key name
+      regkey = argv[2];
+      // get interface index
+      idx = GetInterfaceIndex(guidIntf);
+      //printf("%04d\n", idx); 
+      wchar_t wcsbuf[5];
+      swprintf(wcsbuf, 5, L"%04d", idx);
+      //wcout << wcsbuf << endl;
+      //concat reg path
+      //regpath = L"SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0003";
+      wstring mywstring(REG_NIC_PATH);
+      //wstring concatted_stdstr = mywstring + L"0003";
+      wstring concatted_stdstr = mywstring + wcsbuf;
+      LPCWSTR concatted = concatted_stdstr.c_str();
+      rc = GetKeyData(HKEY_LOCAL_MACHINE, concatted, regkey, (LPBYTE)regkeyValue, regkeyValueSize);
+      if (rc == 1) {
+        //PrintErrorMsg(regkeyValue, dwError);
+        wcout << regkeyValue << endl;
+      } 
+    }
+  }
+	PrintErrorMsg(argv[0], dwError);
+	return dwError;
+}
+
+DWORD
+SetReg(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+)
+{
+	DWORD dwError = ERROR_SUCCESS;
+	GUID guidIntf;
+	LPCWSTR regkey;
+	LPCWSTR regkeyValue;
+	//TCHAR regkeyValue[2] = {0};
+  //DWORD regkeyValueSize = sizeof(regkeyValue);
+	LPWSTR regpat=0;
+	DWORD idx;
+  int rc=0;
+  
+  if (argc != 4)
+  {
+    dwError = ERROR_INVALID_PARAMETER;
+    //__leave;
+  } else {
+    // get the interface GUID
+    if (UuidFromString((RPC_WSTR)argv[1], &guidIntf) != RPC_S_OK)
+    {
+      wcerr << L"Invalid GUID " << argv[1] << endl;
+      dwError = ERROR_INVALID_PARAMETER;
+      //__leave;
+    } else {
+      // get reg key name
+      regkey = argv[2];
+      regkeyValue = argv[3];
+      size_t regkeyValueSize = wcslen(regkeyValue);
+      // get interface index
+      idx = GetInterfaceIndex(guidIntf);
+      //printf("%04d\n", idx); 
+      wchar_t wcsbuf[5];
+      swprintf(wcsbuf, 5, L"%04d", idx);
+      //wcout << wcsbuf << endl;
+      //concat reg path
+      //regpath = L"SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0003";
+      wstring mywstring(REG_NIC_PATH);
+      //wstring concatted_stdstr = mywstring + L"0003";
+      wstring concatted_stdstr = mywstring + wcsbuf;
+      LPCWSTR concatted = concatted_stdstr.c_str();
+      //rc = GetKeyData(HKEY_LOCAL_MACHINE, concatted, regkey, (LPBYTE)regkeyValue, regkeyValueSize);
+      //TODO: different reg key type
+      rc = SetKeyData(HKEY_LOCAL_MACHINE, concatted, REG_SZ , regkey, (LPBYTE)regkeyValue, (DWORD)regkeyValueSize);
+      if (rc == 1) {
+        //PrintErrorMsg(regkeyValue, dwError);
+        wcout << regkeyValue << endl;
+      }else {
+        dwError = rc;
+      }
+    }
+  }
+	PrintErrorMsg(argv[0], dwError);
+	return dwError;
+}
 // show help messages
 DWORD
 Help(
