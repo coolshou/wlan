@@ -126,12 +126,14 @@ SetKeyData(HKEY hRootKey, LPCWSTR subKey, DWORD dwType, LPCWSTR value, LPBYTE da
 int GetKeyData(HKEY hRootKey, LPCWSTR subKey, LPCWSTR value, LPBYTE data, DWORD cbData)
 {
     HKEY hKey;
+    int rc;
     if(RegOpenKeyEx(hRootKey, subKey, 0, KEY_QUERY_VALUE, &hKey) != ERROR_SUCCESS)
         return 0;
-    if(RegQueryValueEx(hKey, value, NULL, NULL, data, &cbData) != ERROR_SUCCESS)
+    rc = RegQueryValueEx(hKey, value, NULL, NULL, data, &cbData);
+    if( rc != ERROR_SUCCESS)
     {
         RegCloseKey(hKey);
-        return 0;
+        return rc;
     }
     RegCloseKey(hKey);
     return 1;
@@ -3829,7 +3831,9 @@ GetReg(
       if (rc == 1) {
         //PrintErrorMsg(regkeyValue, dwError);
         wcout << regkeyValue << endl;
-      } 
+      } else {
+        dwError = rc;
+      }
     }
   }
 	PrintErrorMsg(argv[0], dwError);
@@ -3846,8 +3850,6 @@ SetReg(
 	GUID guidIntf;
 	LPCWSTR regkey;
 	LPCWSTR regkeyValue;
-	//TCHAR regkeyValue[2] = {0};
-  //DWORD regkeyValueSize = sizeof(regkeyValue);
 	LPWSTR regpat=0;
 	DWORD idx;
   int rc=0;
@@ -3870,21 +3872,17 @@ SetReg(
       size_t regkeyValueSize = wcslen(regkeyValue);
       // get interface index
       idx = GetInterfaceIndex(guidIntf);
-      //printf("%04d\n", idx); 
       wchar_t wcsbuf[5];
       swprintf(wcsbuf, 5, L"%04d", idx);
-      //wcout << wcsbuf << endl;
       //concat reg path
       //regpath = L"SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0003";
       wstring mywstring(REG_NIC_PATH);
       //wstring concatted_stdstr = mywstring + L"0003";
       wstring concatted_stdstr = mywstring + wcsbuf;
       LPCWSTR concatted = concatted_stdstr.c_str();
-      //rc = GetKeyData(HKEY_LOCAL_MACHINE, concatted, regkey, (LPBYTE)regkeyValue, regkeyValueSize);
       //TODO: different reg key type
       rc = SetKeyData(HKEY_LOCAL_MACHINE, concatted, REG_SZ , regkey, (LPBYTE)regkeyValue, (DWORD)regkeyValueSize);
       if (rc == 1) {
-        //PrintErrorMsg(regkeyValue, dwError);
         wcout << regkeyValue << endl;
       }else {
         dwError = rc;
