@@ -28,6 +28,7 @@ Environment:
 #include <iomanip>
 #include <vector>
 #include <atlstr.h>
+#include <Shlobj.h>
 
 #include <netioapi.h> //MIB_IF_TABLE2
 #include <iphlpapi.h>
@@ -3678,27 +3679,6 @@ WLAN_COMMAND g_Commands[] = {
         TRUE,
         L"Use EnumInterface (ei) command to get the GUID of an interface."
     },
-/*
-	//Disable/enable Interface
-	{
-		L"DisableInterface",
-		L"di",
-		DisableInterface,
-		L"Disable network Interface. (require Administrator)",
-		L"<interface Index> ",
-		TRUE,
-		L"Use GetInterfaceList (gi) command to get the Index of an interface."
-	},
-	{
-		L"EnableInterface",
-		L"eni",
-		EnableInterface,
-		L"Enable network Interface. (require Administrator)",
-		L"<interface Index> ",
-		TRUE,
-		L"Use GetInterfaceList (gi) command to get the Index of an interface."
-	},
-*/
     // connection related commands
     {
         L"Connect",
@@ -3755,7 +3735,27 @@ WLAN_COMMAND g_Commands[] = {
       TRUE,
       L"Use EnumInterface (ei) command to get the GUID of an interface."
   },
-
+/*
+	//Disable/enable Interface, require Administrator right
+	{
+		L"DisableInterface",
+		L"dn",
+		DisableInterface,
+		L"Disable network Interface. (require Administrator)",
+		L"<interface Index> ",
+		TRUE,
+		L"Use GetInterfaceList (gi) command to get the Index of an interface."
+	},
+	{
+		L"EnableInterface",
+		L"en",
+		EnableInterface,
+		L"Enable network Interface. (require Administrator)",
+		L"<interface Index> ",
+		TRUE,
+		L"Use GetInterfaceList (gi) command to get the Index of an interface."
+	},
+*/
     // other commands
     {
         L"RegisterNotif",
@@ -3980,21 +3980,24 @@ wmain(
 {
     DWORD dwRetCode = ERROR_SUCCESS;
 	OSVERSIONINFOEX os;
-	if (GetVersion2(&os) == TRUE) {
-		//wcout << L"os major ver: " << os.dwMajorVersion << endl;
-		OSMajor = os.dwMajorVersion;
-	}
-    if (argc <= 1)
-    {
+	if (! IsUserAnAdmin()) {
+    //wcout << "~~Admin~~" << endl;
+    wcout << "Access Denied. Administrator permissions are " <<
+            "needed to use the selected options. Use an administrator command " <<
+            "prompt to complete these tasks." << endl;
+    dwRetCode = ERROR_ELEVATION_REQUIRED;
+	} else {
+    if (GetVersion2(&os) == TRUE) {
+      //wcout << L"os major ver: " << os.dwMajorVersion << endl;
+      OSMajor = os.dwMajorVersion;
+    }
+    if (argc <= 1) {
         wcout << L"Please type \"" << argv[0] << L" ?\" for help." << endl;
         dwRetCode = ERROR_INVALID_PARAMETER;
+    } else {
+      // don't pass in the first parameter
+      dwRetCode = ExecuteCommand(argc-1, argv+1);
     }
-    else
-    {
-        // don't pass in the first parameter
-		dwRetCode = ExecuteCommand(argc-1, argv+1);
-    }
-	//wcout << "dwRetCode:" << dwRetCode;
+	}
     return dwRetCode;
 }
-
