@@ -2323,6 +2323,93 @@ GetInterfaceIndex(
 	}
 	return (dwError);
 }
+// query interface connection rssi
+DWORD
+GetRSSI(
+	__in int argc,
+	__in_ecount(argc) LPWSTR argv[]
+)
+{
+	DWORD dwError = ERROR_SUCCESS;
+	HANDLE hClient = NULL;
+	GUID guidIntf;
+	//WLAN_INTERFACE_STATE isState;
+    LONG iRSSI;
+	PWLAN_CONNECTION_ATTRIBUTES pCurrentNetwork = NULL;
+	WCHAR strSsid[DOT11_SSID_MAX_LENGTH + 1];
+	//WLAN_RADIO_STATE wlanRadioState;
+	PVOID pData = NULL;
+	DWORD dwDataSize = 0;
+
+	__try
+	{
+		if (argc != 2)
+		{
+			dwError = ERROR_INVALID_PARAMETER;
+			__leave;
+		}
+
+		// get the interface GUID
+		if (UuidFromString((RPC_WSTR)argv[1], &guidIntf) != RPC_S_OK)
+		{
+			wcerr << L"Invalid GUID " << argv[1] << endl;
+			dwError = ERROR_INVALID_PARAMETER;
+			__leave;
+		}
+
+		// open handle
+		if ((dwError = OpenHandleAndCheckVersion(
+			&hClient
+		)) != ERROR_SUCCESS)
+		{
+			__leave;
+		}
+
+		// query interface rssi
+		if ((dwError = WlanQueryInterface(
+			hClient,
+			&guidIntf,
+			wlan_intf_opcode_rssi,
+			NULL,                       // reserved
+			&dwDataSize,
+			&pData,
+			NULL                        // not interesed in the type of the opcode value
+		)) != ERROR_SUCCESS)
+		{
+			__leave;
+		}
+
+		//if (dwDataSize != sizeof(WLAN_INTERFACE_STATE))
+		//{
+		//	dwError = ERROR_INVALID_DATA;
+	    //		__leave;
+		//}
+
+		iRSSI = *((LONG)pData);
+
+		// print interface state
+		wcout << L"RSSI: " << iRSSI << endl;
+	}
+	__finally
+	{
+		if (pData != NULL)
+		{
+			WlanFreeMemory(pData);
+		}
+
+		// clean up
+		if (hClient != NULL)
+		{
+			WlanCloseHandle(
+				hClient,
+				NULL            // reserved
+			);
+		}
+	}
+
+	PrintErrorMsg(argv[0], dwError);
+	return dwError;
+}
 // query interface connection state
 DWORD
 State(
@@ -3716,6 +3803,15 @@ WLAN_COMMAND g_Commands[] = {
 		TRUE,
 		L"Use EnumInterface (ei) command to get the GUID of an interface."
 	},
+    {
+        L"GetRSSI",
+        L"rssi",
+        GetRSSI,
+        L"Get current RSSI of an interface.",
+        L"<interface GUID>",
+		TRUE,
+		L"Use EnumInterface (ei) command to get the GUID of an interface."
+    },
 	//register command
   {
       L"GetRegkeyValue",
