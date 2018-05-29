@@ -3915,45 +3915,44 @@ WLAN_COMMAND g_Commands[] = {
 		L"Use EnumInterface (ei) command to get the GUID of an interface."
     },
 	//register command
-  {
-      L"GetRegkeyValue",
-      L"gr",
-      GetReg,
-      L"Get interface reg key's value.",
-      L"<interface GUID> regkey",
-      TRUE,
-      L"Use EnumInterface (ei) command to get the GUID of an interface."
-  },
-  {
-      L"SetRegkeyValue",
-      L"sr",
-      SetReg,
-      L"Set interface reg key with value.",
-      L"<interface GUID> regkey value",
-      TRUE,
-      L"Use EnumInterface (ei) command to get the GUID of an interface."
-  },
-/*
-	//Disable/enable Interface, require Administrator right
-	{
-		L"DisableInterface",
-		L"dn",
-		DisableInterface,
-		L"Disable network Interface. (require Administrator)",
-		L"<interface Index> ",
-		TRUE,
-		L"Use GetInterfaceList (gi) command to get the Index of an interface."
-	},
-	{
-		L"EnableInterface",
-		L"en",
-		EnableInterface,
-		L"Enable network Interface. (require Administrator)",
-		L"<interface Index> ",
-		TRUE,
-		L"Use GetInterfaceList (gi) command to get the Index of an interface."
-	},
-*/
+    {
+        L"GetRegkeyValue",
+        L"gr",
+        GetReg,
+        L"Get interface reg key's value.",
+        L"<interface GUID> regkey",
+        TRUE,
+        L"Use EnumInterface (ei) command to get the GUID of an interface."
+    },
+    {
+        L"SetRegkeyValue",
+        L"sr",
+        SetReg,
+        L"Set interface reg key with value.",
+        L"<interface GUID> regkey value",
+        TRUE,
+        L"Use EnumInterface (ei) command to get the GUID of an interface."
+    },
+  //Disable/enable Interface, require Administrator right
+    {
+        L"DisableInterface",
+        L"dn",
+        DisableInterface,
+        L"Disable network Interface. (require Administrator)",
+        L"<interface Index> ",
+        TRUE,
+        L"Use GetInterfaceList (gi) command to get the Index of an interface."
+    },
+    {
+        L"EnableInterface",
+        L"en",
+        EnableInterface,
+        L"Enable network Interface. (require Administrator)",
+        L"<interface Index> ",
+        TRUE,
+        L"Use GetInterfaceList (gi) command to get the Index of an interface."
+    },
+
     // other commands
     {
         L"RegisterNotif",
