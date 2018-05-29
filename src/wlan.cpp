@@ -2333,11 +2333,8 @@ GetRSSI(
 	DWORD dwError = ERROR_SUCCESS;
 	HANDLE hClient = NULL;
 	GUID guidIntf;
-	//WLAN_INTERFACE_STATE isState;
-    LONG iRSSI;
-	PWLAN_CONNECTION_ATTRIBUTES pCurrentNetwork = NULL;
-	WCHAR strSsid[DOT11_SSID_MAX_LENGTH + 1];
-	//WLAN_RADIO_STATE wlanRadioState;
+	WLAN_INTERFACE_STATE isState;
+	LONG rssi = 0;
 	PVOID pData = NULL;
 	DWORD dwDataSize = 0;
 
@@ -2348,7 +2345,6 @@ GetRSSI(
 			dwError = ERROR_INVALID_PARAMETER;
 			__leave;
 		}
-
 		// get the interface GUID
 		if (UuidFromString((RPC_WSTR)argv[1], &guidIntf) != RPC_S_OK)
 		{
@@ -2356,7 +2352,6 @@ GetRSSI(
 			dwError = ERROR_INVALID_PARAMETER;
 			__leave;
 		}
-
 		// open handle
 		if ((dwError = OpenHandleAndCheckVersion(
 			&hClient
@@ -2364,31 +2359,46 @@ GetRSSI(
 		{
 			__leave;
 		}
-
-		// query interface rssi
-		if ((dwError = WlanQueryInterface(
+		dwError = WlanQueryInterface(
 			hClient,
 			&guidIntf,
-			wlan_intf_opcode_rssi,
+			wlan_intf_opcode_interface_state,
 			NULL,                       // reserved
 			&dwDataSize,
 			&pData,
 			NULL                        // not interesed in the type of the opcode value
-		)) != ERROR_SUCCESS)
-		{
+			);
+		if (dwError != ERROR_SUCCESS) {
 			__leave;
 		}
+		else {
+			isState = *((PWLAN_INTERFACE_STATE)pData);
+			if (isState == wlan_interface_state_connected) {
+				dwDataSize = sizeof(rssi);
+				// query interface rssi
+				if ((dwError = WlanQueryInterface(
+					hClient,
+					&guidIntf,
+					wlan_intf_opcode_rssi,
+					NULL,                       // reserved
+					&dwDataSize,
+					(PVOID*)&rssi,
+					NULL                        // not interesed in the type of the opcode value
+				)) != ERROR_SUCCESS)
+				{
+					__leave;
+				}
+				//&pData,
+				//iRSSI = *((LONG)pData);
+				//rssi = *((PLONG)pData);
+				// print interface state
+				wcout << L"RSSI: " << rssi << endl;
+			}
+			else {
+				wcout << L"State: " << GetInterfaceStateString(isState) << endl;
+			}
 
-		//if (dwDataSize != sizeof(WLAN_INTERFACE_STATE))
-		//{
-		//	dwError = ERROR_INVALID_DATA;
-	    //		__leave;
-		//}
-
-		iRSSI = *((LONG)pData);
-
-		// print interface state
-		wcout << L"RSSI: " << iRSSI << endl;
+		}
 	}
 	__finally
 	{
