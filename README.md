@@ -30,7 +30,7 @@ The following commands are available. Use "help xyz" to show the description of 
         Disconnect(dc)
         Discover(disc)
         State(st)
-		GetRSSI(rssi)
+        GetRSSI(rssi)
         GetRegkeyValue(gr)
         SetRegkeyValue(sr)
         RegisterNotif(r)
