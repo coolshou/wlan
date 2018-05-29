@@ -2396,12 +2396,11 @@ GetRSSI(
 			{
 				pCurrentNetwork = (PWLAN_CONNECTION_ATTRIBUTES)pData;
 				bssid = pCurrentNetwork->wlanAssociationAttributes.dot11Bssid;
-				wcout << "BSSID: " << GetBssidString(pCurrentNetwork->wlanAssociationAttributes.dot11Bssid) << endl;
+				//wcout << "BSSID: " << GetBssidString(pCurrentNetwork->wlanAssociationAttributes.dot11Bssid) << endl;
 
 			}
 			else {
 				wcout << L"TODO, not connected, get MAC address by args" << endl;
-
 				__leave;
 			}
 
@@ -2433,11 +2432,13 @@ GetRSSI(
 							//wcout << L"\t";
 							//wcout << pBss->lRssi << endl;
 							iRssi = pBss->lRssi;
+							break;
 						}
 					}
-					if (iRssi > -200) {
-						wcout << L"RSSI: " << iRssi << endl;
-					}
+					
+				}
+				if (iRssi > -200) {
+					wcout << L"RSSI: " << iRssi << endl;
 				}
 			}else{
 				__leave;
@@ -2473,7 +2474,7 @@ GetRSSI(
 					if ((dwError == ERROR_SUCCESS) && (dwDataSize >= sizeof(LONG))) {
 						//iRSSI = *((LONG)pData);
 						rssi = *((PLONG)pData);
-						WlanFreeMemory(pData);
+						//WlanFreeMemory(pData);
 							// print interface state
 						wcout << L"RSSI: " << rssi << endl;
 					}
