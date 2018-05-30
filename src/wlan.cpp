@@ -43,6 +43,8 @@ Environment:
 #include <Ndisguid.h> //GUID_DEVINTERFACE_NET
 // headers needed to use WLAN APIs 
 #include <wlanapi.h>
+#include <cfgmgr32.h>
+#include <atlconv.h>
 
 #include "CommandError.h"				// CWin32ErrToWString
 #include "version.h"
@@ -1832,64 +1834,63 @@ vector<MIB_IF_ROW2>* getDevices(NDIS_PHYSICAL_MEDIUM type)
 
 
 //This function will require Administrator
-void EnableNetDevice(bool aState, int index)
+bool EnableNetDevice(bool bEnable, LPWSTR szConnectionName)
 {
-	HDEVINFO NetPnPHandle;
-	SP_PROPCHANGE_PARAMS PCHP;
-	SP_DEVINFO_DATA DeviceData;
-	RPC_WSTR strGuid = NULL;
+	//netsh interface set interface name="Wi-Fi 2" admin=disable
+	//netsh interface set interface name="Wi-Fi 2" admin=enable
+	SHELLEXECUTEINFO ShExecInfo = {0};
+	TCHAR Path[MAX_PATH];
+	CString szNetsh;
+	CString szCmd;
+	LPCWSTR pNetsh;
+	LPCWSTR pCmdArg;
+	ZeroMemory(Path, MAX_PATH);
+	GetSystemDirectory(Path, MAX_PATH);
 
-
-	NetPnPHandle = SetupDiGetClassDevs(&GUID_DEVCLASS_NET, 0, 0, DIGCF_PRESENT);
-	//NetPnPHandle = SetupDiGetClassDevs(&GUID_DEVCLASS_NET, 0, 0, DIGCF_DEVICEINTERFACE);
-	//GUID_DEVCLASS_NET
-	//GUID_DEVINTERFACE_NET
-	if (NetPnPHandle == INVALID_HANDLE_VALUE)
-	{
-		return;
-	}
-
-	DeviceData.cbSize = sizeof(SP_DEVINFO_DATA);
-	if (SetupDiEnumDeviceInfo(NetPnPHandle, index, &DeviceData)) {
-		PCHP.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
-		wchar_t  szDesc[MAX_PATH] = { 0 };
-		if (SetupDiGetClassDescription(&DeviceData.ClassGuid, szDesc, MAX_PATH, NULL)) {
-			wcout << index << L": ClassDescription: " << szDesc << endl;
-		}
-		if (UuidToString(&DeviceData.ClassGuid, &strGuid) == RPC_S_OK)
-		{
-			wcout << index << L": ClassGuid: " << strGuid << endl;
-		}
-		wchar_t  szFriendlyName[MAX_PATH] = { 0 };
-		if (SetupDiGetDeviceRegistryProperty(NetPnPHandle, &DeviceData,
-			SPDRP_FRIENDLYNAME, 0L, (PBYTE)szFriendlyName, 2048, 0)) {
-			wcout << index << L": FriendlyName: " << szFriendlyName << endl;
-		}
-		//why we need to call it here
-		//SetupDiSetClassInstallParams(NetPnPHandle, &DeviceData, &PCHP.ClassInstallHeader, sizeof(SP_PROPCHANGE_PARAMS));
-		
-		PCHP.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER);
-		PCHP.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE;
-		PCHP.HwProfile = 0;
-		PCHP.Scope = DICS_FLAG_CONFIGSPECIFIC;
-		if (aState) PCHP.StateChange = DICS_ENABLE;
-		else  PCHP.StateChange = DICS_DISABLE;
-		SetupDiSetClassInstallParams(NetPnPHandle, &DeviceData, &PCHP.ClassInstallHeader, sizeof(SP_PROPCHANGE_PARAMS));
-		if (SetupDiCallClassInstaller(DIF_PROPERTYCHANGE, NetPnPHandle, &DeviceData)) {
-			wcout << L"EnableNetDevice: " << index << L" : " << aState << endl;
-		}
-		else {
-			DWORD dwErr = GetLastError();
-			std::wstring szErr = CWin32ErrToWString()(dwErr);
-			wcout << L"ERROR: " << szErr << endl;
-		}
-			
+	szNetsh.Format(_T("%s\\netsh.exe"), Path);
+	if (bEnable){
+		szCmd.Format(_T("interface set interface name=\"%s\" admin=ENABLED"), szConnectionName);
 	}
 	else {
-		wcout << L"SetupDiEnumDeviceInfo not found device: " << index << endl;
+		szCmd.Format(_T("interface set interface name=\"%s\" admin=DISABLED"), szConnectionName);
 	}
-	//DeviceData.cbSize = sizeof(SP_DEVINFO_DATA);
-	SetupDiDestroyDeviceInfoList(NetPnPHandle);
+	pNetsh = szNetsh.AllocSysString();
+	pCmdArg = szCmd.AllocSysString();
+
+	ShExecInfo.cbSize = sizeof(SHELLEXECUTEINFO);
+	ShExecInfo.fMask = NULL;
+	ShExecInfo.hwnd = NULL;
+	ShExecInfo.lpVerb = L"open";
+	ShExecInfo.lpFile = pNetsh;
+	ShExecInfo.lpParameters = pCmdArg;
+	ShExecInfo.lpDirectory = NULL;
+	//ShExecInfo.nShow = SW_SHOWNORMAL;
+	ShExecInfo.nShow = SW_HIDE;
+	ShExecInfo.hInstApp = NULL;
+
+	if (ShellExecuteEx(&ShExecInfo)) {
+		//NOTE: exec netsh,  it will take 1~3 sec to take effect
+		Sleep(2000);
+		wcout << "success exec: " << pNetsh << " " << pCmdArg << endl;
+		return true;
+	}
+	else {
+		DWORD errNo = GetLastError();
+		LPVOID lpMsgBuf;
+
+		FormatMessage(
+			FORMAT_MESSAGE_ALLOCATE_BUFFER |
+			FORMAT_MESSAGE_FROM_SYSTEM |
+			FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL,
+			errNo, 
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
+			(LPTSTR)&lpMsgBuf,
+			0,
+			NULL);
+		wcerr << lpMsgBuf << endl;
+		return false;
+	}
 }
 
 DWORD
@@ -1899,8 +1900,7 @@ DisableInterface(
 )
 {
 	DWORD dwError = ERROR_SUCCESS;
-	LPWSTR sIdx;
-	int idx;
+	LPWSTR sAliasName;
 	__try
 	{
 		if (argc != 2)
@@ -1908,9 +1908,10 @@ DisableInterface(
 			dwError = ERROR_INVALID_PARAMETER;
 			__leave;
 		}
-		sIdx = argv[1];
-		idx = _wtoi(sIdx);
-		EnableNetDevice(false, idx);
+		sAliasName = argv[1];
+		if (!EnableNetDevice(false, sAliasName)) {
+			__leave;
+		}
 	}
 	__finally
 	{
@@ -1928,8 +1929,7 @@ EnableInterface(
 )
 {
 	DWORD dwError = ERROR_SUCCESS;
-	LPWSTR sIdx;
-	int idx;
+	LPWSTR sAliasName;
 	__try
 	{
 		if (argc != 2)
@@ -1937,9 +1937,12 @@ EnableInterface(
 			dwError = ERROR_INVALID_PARAMETER;
 			__leave;
 		}
-		sIdx = argv[1];
-		idx = _wtoi(sIdx);
-		EnableNetDevice(true, idx);
+		//alias name
+		sAliasName = argv[1];
+		//wcout << "sAliasName:" << sAliasName << endl;
+		if (! EnableNetDevice(true, sAliasName)) {
+			__leave;
+		};
 	}
 	__finally
 	{
@@ -3936,21 +3939,21 @@ WLAN_COMMAND g_Commands[] = {
   //Disable/enable Interface, require Administrator right
     {
         L"DisableInterface",
-        L"dn",
+        L"disable",
         DisableInterface,
         L"Disable network Interface. (require Administrator)",
-        L"<interface Index> ",
+        L"<interface alias name> ",
         TRUE,
-        L"Use GetInterfaceList (gi) command to get the Index of an interface."
+        L"Use GetInterfaceList (gi) command to get the  alias name of an interface."
     },
     {
         L"EnableInterface",
-        L"en",
+        L"enable",
         EnableInterface,
         L"Enable network Interface. (require Administrator)",
-        L"<interface Index> ",
+        L"<interface alias name> ",
         TRUE,
-        L"Use GetInterfaceList (gi) command to get the Index of an interface."
+        L"Use GetInterfaceList (gi) command to get the  alias name of an interface."
     },
 
     // other commands
