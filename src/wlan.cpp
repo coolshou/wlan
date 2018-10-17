@@ -760,7 +760,7 @@ PrintBssInfo(
     {
 		//col mode, use \t to sepelate
 		//MAC SSID CenterFrequency RSSI LinkQuality phyType
-		wcout << GetBssidString(pBss->dot11Bssid);
+		wcout << GetBssidString(pBss->dot11Bssid); //
 		wcout << L"\t";
 		wcout << SsidToStringW(strSsid, sizeof(strSsid) / sizeof(WCHAR), &pBss->dot11Ssid);
 		wcout << L"\t";
@@ -769,6 +769,8 @@ PrintBssInfo(
 		wcout << pBss->lRssi;
 		wcout << L"\t";
 		wcout << pBss->uLinkQuality;
+		wcout << L"\t";
+		wcout << L"N/A";
 		wcout << L"\t";
 		wcout << GetPhyTypeString(pBss->dot11BssPhyType);
 		/*
