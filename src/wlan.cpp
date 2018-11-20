@@ -755,7 +755,9 @@ PrintBssInfo(
     WCHAR strSsid[DOT11_SSID_MAX_LENGTH+1];
     UINT i;
     PBYTE pIe = NULL;
-    
+    WLAN_RATE_SET wlanRateSet;
+    USHORT rate;
+    double rate_in_mbps;
     if (pBss != NULL)
     {
 		//col mode, use \t to sepelate
@@ -770,7 +772,13 @@ PrintBssInfo(
 		wcout << L"\t";
 		wcout << pBss->uLinkQuality;
 		wcout << L"\t";
-		wcout << L"N/A";
+		//https://docs.microsoft.com/zh-tw/windows/desktop/api/wlanapi/ns-wlanapi-_wlan_rate_set
+		wlanRateSet = pBss->wlanRateSet;
+		i = wlanRateSet.uRateSetLength;
+		rate = wlanRateSet.usRateSet[i-1];
+		rate_in_mbps = (rate & 0x7FFF) * 0.5;
+		//basic data rate
+		wcout << rate_in_mbps;
 		wcout << L"\t";
 		wcout << GetPhyTypeString(pBss->dot11BssPhyType);
 		/*
@@ -779,38 +787,7 @@ PrintBssInfo(
 		*/
 		wcout << L"\t";
 		wcout << endl;
-		if (0) {
-        // MAC address
-        wcout << L"MAC address: ";
-		wcout << GetBssidString(pBss->dot11Bssid);
-		wcout << endl;
-        // SSID
-        wcout << L"\tSSID: " << SsidToStringW(strSsid, sizeof(strSsid)/sizeof(WCHAR), &pBss->dot11Ssid) << endl;
-
-        // Beacon period
-        wcout << L"\tBeacon period: " << dec << pBss->usBeaconPeriod << L" TU" << endl;
-        
-        // IE , TODO: parser IE for MU MIMO/TxBF....
-		if (0) {
-			wcout << L"\tIE";
-			i = 0;
-			pIe = (PBYTE)(pBss)+pBss->ulIeOffset;
-
-			// print 8 byte per line
-			while (i < pBss->ulIeSize)
-			{
-				if (i % 8 == 0)
-				{
-					wcout << endl << L"\t\t";
-				}
-				wcout << setw(2) << setfill(L'0') << hex << (UINT)pIe[i] << L" ";
-				i++;
-			}
-		}
-        wcout << endl;
-    }
-    }
-    
+    }   
 }
 
 #define WLAN_INVALID_COUNTER (ULONGLONG)-1
