@@ -9,7 +9,8 @@ Date:
 	11/08/2005  created
     08/22/2006  modified
 	05/02/2017  add 11n/11ac
-
+	01/02/2019  add 11ad/11ax
+	
 Environment:
    User mode only
 --*/
@@ -386,6 +387,8 @@ GetPhyTypeString(
 )
 {
     LPWSTR strRetCode;
+	wchar_t wuDot11PhyType[512];
+	wsprintfW(wuDot11PhyType, L"\"Unknown PHY type (%d)\"", uDot11PhyType);
 
     switch(uDot11PhyType)
     {
@@ -416,8 +419,15 @@ GetPhyTypeString(
 		case dot11_phy_type_vht:
 			strRetCode = L"\"802.11ac\"";
 			break;
+		case dot11_phy_type_dmg:
+			strRetCode = L"\"802.11ad\"";
+			break;
+		case dot11_phy_type_he:
+			strRetCode = L"\"802.11ax\"";
+			break;
         default:
-            strRetCode = L"\"Unknown PHY type\"";
+            //strRetCode = L"\"Unknown PHY type (" << wuDot11PhyType << L")\"";
+			strRetCode = wuDot11PhyType;
     }
 
     return strRetCode;
@@ -772,6 +782,10 @@ PrintBssInfo(
 		wcout << L"\t";
 		wcout << pBss->uLinkQuality;
 		wcout << L"\t";
+		/*
+		//https://msdn.microsoft.com/en-us/library/windows/desktop/aa370026(v=vs.85).aspx
+		//wcout << pBss->wlanRateSet;
+		*/
 		//https://docs.microsoft.com/zh-tw/windows/desktop/api/wlanapi/ns-wlanapi-_wlan_rate_set
 		wlanRateSet = pBss->wlanRateSet;
 		i = wlanRateSet.uRateSetLength;
@@ -779,12 +793,9 @@ PrintBssInfo(
 		rate_in_mbps = (rate & 0x7FFF) * 0.5;
 		//basic data rate
 		wcout << rate_in_mbps;
+		//TODO: 11n/ac/ax rate
 		wcout << L"\t";
 		wcout << GetPhyTypeString(pBss->dot11BssPhyType);
-		/*
-		//https://msdn.microsoft.com/en-us/library/windows/desktop/aa370026(v=vs.85).aspx
-		//wcout << pBss->wlanRateSet;
-		*/
 		wcout << L"\t";
 		wcout << endl;
     }   
