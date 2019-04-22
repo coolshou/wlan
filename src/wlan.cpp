@@ -422,7 +422,7 @@ GetPhyTypeString(
 		case dot11_phy_type_dmg:
 			strRetCode = L"\"802.11ad\"";
 			break;
-		case dot11_phy_type_he:
+		case dot11_phy_type_he://SDK 10.0.17763 (1809)
 			strRetCode = L"\"802.11ax\"";
 			break;
         default:
@@ -514,6 +514,12 @@ GetAuthAlgoString(
         case DOT11_AUTH_ALGO_RSNA_PSK:
             strRetCode = L"\"WPA2-Personal\"";
             break;
+		case DOT11_AUTH_ALGO_WPA3: //SDK 10.0.18326 (1903)
+			strRetCode = L"\"WPA3-Enterprise\"";
+			break;
+		case DOT11_AUTH_ALGO_WPA3_SAE: //SDK 10.0.18326 (1903)
+			strRetCode = L"\"WPA3-Personal\"";
+			break;
         default:
             if (dot11AuthAlgo & DOT11_AUTH_ALGO_IHV_START)
             {
@@ -797,6 +803,10 @@ PrintBssInfo(
 		wcout << L"\t";
 		wcout << GetPhyTypeString(pBss->dot11BssPhyType);
 		wcout << L"\t";
+		//TODO: parser ulIeOffset/ulIeSize
+		wcout << pBss->ulIeOffset;
+		wcout << L"\t";
+		wcout << pBss->ulIeSize;
 		wcout << endl;
     }   
 }
@@ -1992,6 +2002,7 @@ GetInterfaceList(
 )
 {
 	DWORD dwError = ERROR_SUCCESS;
+	int rs = 0;
 	int if_type = 0;
 	PMIB_IF_TABLE2 if_table = NULL;
 	unsigned long size = 0;
@@ -2007,12 +2018,13 @@ GetInterfaceList(
 		// Retrieve list of network interfaces
 		//vista above only, only enabled NIC
 		//wcout << "GetIfTable2" << endl;
-		if (GetIfTable2(&if_table) == NOERROR && if_table) {
+		rs = GetIfTable2(&if_table);
+		if ( rs == NOERROR && if_table) {
 			//wcout << "Num: "<< if_table->NumEntries << endl;
 			for (i = 0; i < if_table->NumEntries; i++) {
 				if ((if_table->Table[i].Type == IF_TYPE_ETHERNET_CSMACD) || (if_table->Table[i].Type == IF_TYPE_IEEE80211)) {
 					if (if_table->Table[i].InterfaceAndOperStatusFlags.HardwareInterface 
-						&& (if_table->Table[i].OperStatus != 6)
+						&& (if_table->Table[i].OperStatus != IfOperStatusNotPresent)
 						//&& if_table->Table[i].InterfaceAndOperStatusFlags.ConnectorPresent
 						)
 					{
@@ -2028,8 +2040,18 @@ GetInterfaceList(
 							wcout << L" : " << (LPWSTR)strGuid;
 							RpcStringFreeW(&strGuid);
 						}
-						wcout << L" : " << if_table->Table[i].Description ;
-						wcout << L" : " << if_table->Table[i].Alias ;
+						if (if_table->Table[i].Description) {
+							wcout << L" : " << if_table->Table[i].Description;
+						}
+						else {
+							wcout << L" : N/A";
+						}
+						if (if_table->Table[i].Alias) {
+							wcout << L" : " << if_table->Table[i].Alias;
+						}
+						else {
+							wcout << L" : N/A";
+						}
 						//AdminStatus= 1 : interface is up, 2 : disable, 3 : testing mode
 						wcout << L" : " << if_table->Table[i].AdminStatus;
 						//show device exist or not/ disable will be 0
@@ -2044,7 +2066,11 @@ GetInterfaceList(
 					}
 				}
 			}
-		}	
+		}
+		else {
+			wcout << L"GetIfTable2 fail:" << rs << endl;
+			dwError = rs;
+		}
 	}
 	__finally
 	{
@@ -4171,23 +4197,22 @@ wmain(
     DWORD dwRetCode = ERROR_SUCCESS;
 	OSVERSIONINFOEX os;
 	if (! IsUserAnAdmin()) {
-    //wcout << "~~Admin~~" << endl;
-    wcout << "Access Denied. Administrator permissions are " <<
-            "needed to use the selected options. Use an administrator command " <<
-            "prompt to complete these tasks." << endl;
-    dwRetCode = ERROR_ELEVATION_REQUIRED;
+		wcout << "Access Denied. Administrator permissions are " <<
+				"needed to use the selected options. Use an administrator command " <<
+				"prompt to complete these tasks." << endl;
+		dwRetCode = ERROR_ELEVATION_REQUIRED;
 	} else {
-    if (GetVersion2(&os) == TRUE) {
-      //wcout << L"os major ver: " << os.dwMajorVersion << endl;
-      OSMajor = os.dwMajorVersion;
-    }
-    if (argc <= 1) {
-        wcout << L"Please type \"" << argv[0] << L" ?\" for help." << endl;
-        dwRetCode = ERROR_INVALID_PARAMETER;
-    } else {
-      // don't pass in the first parameter
-      dwRetCode = ExecuteCommand(argc-1, argv+1);
-    }
+		if (GetVersion2(&os) == TRUE) {
+		  //wcout << L"os major ver: " << os.dwMajorVersion << endl;
+		  OSMajor = os.dwMajorVersion;
+		}
+		if (argc <= 1) {
+			wcout << L"Please type \"" << argv[0] << L" ?\" for help." << endl;
+			dwRetCode = ERROR_INVALID_PARAMETER;
+		} else {
+		  // don't pass in the first parameter
+		  dwRetCode = ExecuteCommand(argc-1, argv+1);
+		}
 	}
     return dwRetCode;
 }
