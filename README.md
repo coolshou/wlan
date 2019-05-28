@@ -48,3 +48,7 @@ The following commands are available. Use "help xyz" to show the description of 
 ```
 # reference
   https://msdn.microsoft.com/en-us/library/windows/desktop/ms706275(v=vs.85).aspx
+
+# Note:
+	Win10 1809(SDK 10.0.17763) add 11ax phy: "dot11_phy_type_he"
+	Win10 1903(SDK 10.0.18362) add WPA3: DOT11_AUTH_ALGO_WPA3 & DOT11_AUTH_ALGO_WPA3_SAE
