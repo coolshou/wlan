@@ -3,8 +3,15 @@ wlan is the WindowsSDK sample for the WirelessAPI.
 
 
 # require 
-  vc2019
-  
+  vc2019 (v16.1.28922)
+  Win10 SDK 10.0.18362 (1903)
+
+# build wlan.exe, in cmd window run following command
+```
+  build.bat clean
+  build.bat build
+```
+
 # feature
 The following commands are available. Use "help xyz" to show the description of command xyz.
 ```
