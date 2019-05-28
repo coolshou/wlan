@@ -3,7 +3,7 @@ wlan is the WindowsSDK sample for the WirelessAPI.
 
 
 # require 
-  vc2017
+  vc2019
   
 # feature
 The following commands are available. Use "help xyz" to show the description of command xyz.
@@ -33,6 +33,8 @@ The following commands are available. Use "help xyz" to show the description of 
         GetRSSI(rssi)
         GetRegkeyValue(gr)
         SetRegkeyValue(sr)
+        DisableInterface(disable)
+        EnableInterface(enable)
         RegisterNotif(r)
         version(ver)
         help(?)
