@@ -1065,7 +1065,7 @@ RegisterNotification(
 }
 
 // Create Profile
-//<interface GUID> <SSID> <OPEN|WEP|SHARED|WPAPSK|WPA2PSK> <WEP|TKIP|AES> <KEY>
+//<interface GUID> <SSID> <OPEN|WEP|SHARED|WPAPSK|WPA2PSK|WPA3SAE> <WEP|TKIP|AES> <KEY>
 DWORD
 CreateProfile(
 	__in int argc,
@@ -1161,7 +1161,9 @@ CreateProfile(
 			}
 
 		}	
-		else if ((wcscmp(authType, L"WPAPSK") == 0)|| (wcscmp(authType, L"WPA2PSK") == 0)) {
+		else if ((wcscmp(authType, L"WPAPSK") == 0)|| 
+				 (wcscmp(authType, L"WPA2PSK") == 0) ||
+				 (wcscmp(authType, L"WPA3SAE") == 0)) {
 			profileXml += L"<authEncryption>";
 			profileXml += L"<authentication>";
 			if (wcscmp(authType, L"WPAPSK") == 0) {
@@ -1170,13 +1172,20 @@ CreateProfile(
 			if (wcscmp(authType, L"WPA2PSK") == 0) {
 				profileXml += L"WPA2PSK";
 			}
+			if (wcscmp(authType, L"WPA3SAE") == 0) {
+				profileXml += L"WPA3SAE";
+			}
 			profileXml += L"</authentication>";
 			profileXml += L"<encryption>";
-			if (wcscmp(cipherType, L"TKIP") == 0) {
-				profileXml += L"TKIP";
-			}
-			if (wcscmp(cipherType, L"AES") == 0) {
+			if (wcscmp(authType, L"WPA3SAE") == 0) {
 				profileXml += L"AES";
+			} else{
+				if (wcscmp(cipherType, L"TKIP") == 0) {
+					profileXml += L"TKIP";
+				}
+				if (wcscmp(cipherType, L"AES") == 0) {
+					profileXml += L"AES";
+				}
 			}
 			profileXml += L"</encryption>";
 			profileXml += L"<useOneX>false</useOneX>";
@@ -3820,7 +3829,7 @@ WLAN_COMMAND g_Commands[] = {
 		L"cp",
 		CreateProfile,
 		L"Create a profile by a SSID and security.",
-		L"<interface GUID> <SSID> <OPEN|WEP|SHARED|WPAPSK|WPA2PSK> <WEP|TKIP|AES> <KEY>",
+		L"<interface GUID> <SSID> <OPEN|WEP|SHARED|WPAPSK|WPA2PSK|WPA3SAE> <WEP|TKIP|AES> <KEY>",
 		TRUE,
 		L"Use EnumInterface (ei) command to get the GUID of an interface."
 	},
