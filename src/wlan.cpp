@@ -669,7 +669,7 @@ PrintReason(
     __in WLAN_REASON_CODE reason
 )
 {
-    WCHAR strReason[WLSAMPLE_REASON_STRING_LEN];
+    WCHAR strReason[WLSAMPLE_REASON_STRING_LEN]= L"\0";
 
     if (WlanReasonCodeToString(
             reason, 
@@ -2351,7 +2351,149 @@ GetInterfaceIndex(
 	}
 	return (dwError);
 }
-// query interface connection rssi
+// query interface connected BSSID
+DWORD
+GetBSSID(
+    __in int argc,
+    __in_ecount(argc) LPWSTR argv[]
+)
+{
+    DWORD dwError = ERROR_SUCCESS;
+    HANDLE hClient = NULL;
+    GUID guidIntf;
+    WLAN_INTERFACE_STATE isState;
+    LONG rssi = 0;
+    PVOID pData = NULL;
+    DWORD dwDataSize = 0;
+
+    DOT11_SSID dot11Ssid = { 0 };
+    PDOT11_SSID pDot11Ssid = NULL;
+    DOT11_MAC_ADDRESS dot11Bssid = { 0 };
+    PDOT11_MAC_ADDRESS pDot11Bssid = NULL;
+    __try
+    {
+        if ((argc != 2) && (argc != 3))
+        {
+            dwError = ERROR_INVALID_PARAMETER;
+            __leave;
+        }
+        // get the interface GUID
+        if (UuidFromString((RPC_WSTR)argv[1], &guidIntf) != RPC_S_OK)
+        {
+            wcerr << L"Invalid GUID " << argv[1] << endl;
+            dwError = ERROR_INVALID_PARAMETER;
+            __leave;
+        }
+
+        // open handle
+        if ((dwError = OpenHandleAndCheckVersion(
+            &hClient
+        )) != ERROR_SUCCESS)
+        {
+            __leave;
+        }
+        PUCHAR bssid;
+        if (OSMajor >= 10) {
+            //wcout << L"Win10"  << endl;
+            PWLAN_CONNECTION_ATTRIBUTES pCurrentNetwork = NULL;
+
+            //get connected bssid
+            dwError = WlanQueryInterface(
+                hClient,
+                &guidIntf,
+                wlan_intf_opcode_current_connection,
+                NULL,                       // reserved
+                &dwDataSize,
+                &pData,
+                NULL                        // not interesed in the type of the opcode value
+            );
+            if (dwError == ERROR_SUCCESS &&
+                dwDataSize == sizeof(WLAN_CONNECTION_ATTRIBUTES))
+            {
+                pCurrentNetwork = (PWLAN_CONNECTION_ATTRIBUTES)pData;
+                bssid = pCurrentNetwork->wlanAssociationAttributes.dot11Bssid;
+                wcout << "BSSID: " << GetBssidString(bssid) << endl;
+
+            }
+            else {
+                wcout << L"Not connected" << endl;
+                __leave;
+            }
+            
+        }
+        else {
+            dwError = WlanQueryInterface(
+                hClient,
+                &guidIntf,
+                wlan_intf_opcode_interface_state,
+                NULL,                       // reserved
+                &dwDataSize,
+                &pData,
+                NULL                        // not interesed in the type of the opcode value
+            );
+            if (dwError != ERROR_SUCCESS) {
+                __leave;
+            }
+            else {
+                PWLAN_CONNECTION_ATTRIBUTES pConnectInfo = NULL;
+                DWORD connectInfoSize = sizeof(WLAN_CONNECTION_ATTRIBUTES);
+
+                isState = *((PWLAN_INTERFACE_STATE)pData);
+                if (isState == wlan_interface_state_connected) {
+                    dwDataSize = 0;
+                    // query interface rssi, Win10 not support
+                    dwError = WlanQueryInterface(
+                        hClient,
+                        &guidIntf,
+                        wlan_intf_opcode_current_connection,
+                        NULL,                       // reserved
+                        &connectInfoSize,
+                        (PVOID*) &pConnectInfo,
+                        NULL                        // not interesed in the type of the opcode value
+                    );
+                    if ((dwError == ERROR_SUCCESS) && (dwDataSize >= sizeof(LONG))) {
+                        //iRSSI = *((LONG)pData);
+                        bssid = pConnectInfo->wlanAssociationAttributes.dot11Bssid;
+                        //WlanFreeMemory(pData);
+                            // print interface state
+                        wcout << "BSSID: " << GetBssidString(bssid) << endl;
+                    }
+                    else
+                    {
+                        wcout << L"WlanQueryInterface failed with error: " << dwError << endl;
+                        __leave;
+                    }
+
+
+                }
+                else {
+                    wcout << L"State: " << GetInterfaceStateString(isState) << endl;
+                }
+
+            }
+        }
+    }
+    __finally
+    {
+        if (pData != NULL)
+        {
+            WlanFreeMemory(pData);
+        }
+
+        // clean up
+        if (hClient != NULL)
+        {
+            WlanCloseHandle(
+                hClient,
+                NULL            // reserved
+            );
+        }
+    }
+
+    PrintErrorMsg(argv[0], dwError);
+    return dwError;
+}
+// query interface connected rssi
 DWORD
 GetRSSI(
 	__in int argc,
@@ -2428,7 +2570,7 @@ GetRSSI(
 
 			}
 			else {
-				wcout << L"TODO, not connected, get MAC address by args" << endl;
+				wcout << L"Not connected" << endl;
 				__leave;
 			}
 
@@ -2456,9 +2598,6 @@ GetRSSI(
 					if (pBss != NULL) {
 						tBssid = pBss->dot11Bssid;
 						if (*bssid == *tBssid) {
-							//wcout << GetBssidString(pBss->dot11Bssid);
-							//wcout << L"\t";
-							//wcout << pBss->lRssi << endl;
 							iRssi = pBss->lRssi;
 							break;
 						}
@@ -2500,23 +2639,17 @@ GetRSSI(
 						NULL                        // not interesed in the type of the opcode value
 					);
 					if ((dwError == ERROR_SUCCESS) && (dwDataSize >= sizeof(LONG))) {
-						//iRSSI = *((LONG)pData);
 						rssi = *((PLONG)pData);
-						//WlanFreeMemory(pData);
-							// print interface state
 						wcout << L"RSSI: " << rssi << endl;
 					}
 					else
 					{
 						__leave;
 					}
-
-
 				}
 				else {
 					wcout << L"State: " << GetInterfaceStateString(isState) << endl;
 				}
-
 			}
 		}
 	}
@@ -3933,6 +4066,15 @@ WLAN_COMMAND g_Commands[] = {
 		TRUE,
 		L"Use EnumInterface (ei) command to get the GUID of an interface."
 	},
+    {
+            L"GetBSSID",
+            L"bssid",
+            GetBSSID,
+            L"Get current connected BSSID of an interface.",
+            L"<interface GUID>",
+            TRUE,
+            L"Use EnumInterface (ei) command to get the GUID of an interface."
+    },
     {
         L"GetRSSI",
         L"rssi",
