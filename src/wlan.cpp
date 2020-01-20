@@ -2351,6 +2351,95 @@ GetInterfaceIndex(
 	}
 	return (dwError);
 }
+// query interface connected channel
+DWORD
+GetChannel(
+    __in int argc,
+    __in_ecount(argc) LPWSTR argv[]
+)
+{
+    DWORD dwError = ERROR_SUCCESS;
+    HANDLE hClient = NULL;
+    GUID guidIntf;
+    //WLAN_INTERFACE_STATE isState;
+    LONG rssi = 0;
+    ULONG *channel = NULL;
+    DWORD dwDataSize = 0;
+    DWORD dwSizeChannel = sizeof(*channel);
+
+    DOT11_SSID dot11Ssid = { 0 };
+    PDOT11_SSID pDot11Ssid = NULL;
+    DOT11_MAC_ADDRESS dot11Bssid = { 0 };
+    PDOT11_MAC_ADDRESS pDot11Bssid = NULL;
+    __try
+    {
+        if ((argc != 2) && (argc != 3))
+        {
+            dwError = ERROR_INVALID_PARAMETER;
+            __leave;
+        }
+        // get the interface GUID
+        if (UuidFromString((RPC_WSTR)argv[1], &guidIntf) != RPC_S_OK)
+        {
+            wcerr << L"Invalid GUID " << argv[1] << endl;
+            dwError = ERROR_INVALID_PARAMETER;
+            __leave;
+        }
+
+        // open handle
+        if ((dwError = OpenHandleAndCheckVersion(
+            &hClient
+        )) != ERROR_SUCCESS)
+        {
+            __leave;
+        }
+
+        //if (OSMajor >= 10) {
+            //wcout << L"Win10"  << endl;
+            PWLAN_CONNECTION_ATTRIBUTES pCurrentNetwork = NULL;
+
+            //get connected bssid
+            dwError = WlanQueryInterface(
+                hClient,
+                &guidIntf,
+                wlan_intf_opcode_channel_number,
+                NULL,                       // reserved
+                &dwSizeChannel,
+                (PVOID*) &channel,
+                NULL                        // not interesed in the type of the opcode value
+            );
+            if (dwError == ERROR_SUCCESS && channel)
+            {
+                //pCurrentNetwork = (PWLAN_CONNECTION_ATTRIBUTES)pData;
+                //bssid = pCurrentNetwork->wlanAssociationAttributes.dot11Bssid;
+                wcout << "Channel: " << *channel << endl;
+            }
+            else {
+                wcout << L"Not connected" << endl;
+                __leave;
+            }
+           
+    }
+    __finally
+    {
+        if (channel != NULL)
+        {
+            WlanFreeMemory(channel);
+        }
+
+        // clean up
+        if (hClient != NULL)
+        {
+            WlanCloseHandle(
+                hClient,
+                NULL            // reserved
+            );
+        }
+    }
+
+    PrintErrorMsg(argv[0], dwError);
+    return dwError;
+}
 // query interface connected BSSID
 DWORD
 GetBSSID(
@@ -4065,15 +4154,24 @@ WLAN_COMMAND g_Commands[] = {
 		L"<interface GUID>",
 		TRUE,
 		L"Use EnumInterface (ei) command to get the GUID of an interface."
-	},
+	}, 
     {
-            L"GetBSSID",
-            L"bssid",
-            GetBSSID,
-            L"Get current connected BSSID of an interface.",
-            L"<interface GUID>",
-            TRUE,
-            L"Use EnumInterface (ei) command to get the GUID of an interface."
+        L"GetChannel",
+        L"ch",
+        GetChannel,
+        L"Get current connected Channel of an interface.",
+        L"<interface GUID>",
+        TRUE,
+        L"Use EnumInterface (ei) command to get the GUID of an interface."
+    },
+    {
+        L"GetBSSID",
+        L"bssid",
+        GetBSSID,
+        L"Get current connected BSSID of an interface.",
+        L"<interface GUID>",
+        TRUE,
+        L"Use EnumInterface (ei) command to get the GUID of an interface."
     },
     {
         L"GetRSSI",
