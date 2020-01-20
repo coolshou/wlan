@@ -23,6 +23,10 @@ echo ===================================
 exit /b
 
 :Build
+set LIB=""
+set LIBPATH=""
+set INCLUDE=""
+set Path="%SystemRoot%\System32\"
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat"
 REM call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat"
 REM call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86
@@ -38,6 +42,10 @@ mt -manifest "wlan.exe.manifest"  -outputresource:"x64\Release\wlan.exe;#1"
 exit /b
 
 :Clean
+set LIB=""
+set LIBPATH=""
+set INCLUDE=""
+set Path="%SystemRoot%\System32\"
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat"
 REM call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat"
 REM call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86
