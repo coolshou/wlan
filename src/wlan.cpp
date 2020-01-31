@@ -49,6 +49,7 @@ Environment:
 
 #include "CommandError.h"				// CWin32ErrToWString
 #include "version.h"
+#include "wlan.h"
 
 using namespace std;
 
@@ -574,7 +575,9 @@ GetCipherAlgoString(
 /*strBssid: 00:11:22:33:44:55
 //          00-11-22-33-44-55
 */
-DWORD StringWToBSSID(
+/*
+DWORD 
+StringWToBSSID(
 	__in string strBssid,
 	__out uint8_t *results
 //	__out vector<string>* results
@@ -608,6 +611,7 @@ DWORD StringWToBSSID(
 	}
 	return dwRetCode;
 }
+*/
 // get SSID from the WCHAR string
 DWORD
 StringWToSsid(
@@ -762,7 +766,434 @@ GetBssidString(
 	return str;
 }
 
+double 
+get_HTMCSRate(
+    __in int mcs, int sgi, int bandwidth)
+{
+    // mcs: mcs index 0~31
+    // sgi: 0: false, 1: true
+    // bandwidth: 0: HT20, 1: HT40
+    int Division;
+    int rem;
+    double rate=0;
+    Division = mcs / DIV_HT;
+    rem = mcs % DIV_HT;
+    int col = 0;
+    if (sgi) {
+        col = col + 1;
+    }
+    if (bandwidth) {
+        col = col + 2;
+    }
+    rate = HT_MCSRate[rem][col];
+    if (Division > 0) {
+        rate = rate * Division;
+    }
+    //printf("rate=%f \n", rate);
+    //wcerr << "rate=" << rate << "\n";
+
+    //return data rate by HT mcs index
+    return rate;
+}
+int 
+get_HTMCSIdx(
+    __in int mcs)
+{
+    if (mcs >= 255) {
+        return 7;
+    }
+    else if (mcs >= 127) {
+        return 6;
+    }
+    else if (mcs >= 63) {
+        return 5;
+    }
+    else if (mcs >= 31) {
+        return 4;
+    }
+    else if (mcs >= 15) {
+        return 3;
+    }
+    else if (mcs >= 7) {
+        return 2;
+    }
+    else if (mcs >= 3) {
+        return 1;
+    }
+    else if (mcs >= 1) {
+        return 0;
+    }
+    else {
+        return 0;
+    }
+}
+//print HT Capa
+void 
+FuncWlanHTCapa(
+    __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
+    __out int* results, int* isHT40, int* isSGI)
+{
+    //printf("######## FuncWlanHTCapa--->########  \n \n");
+    //printf("IE ElementID:=%d \n", IEID);
+    //printf("IE Information Length:=%d \n \n", IELEN);
+    /*
+    printf("******IE Information Feild***** \n");
+    for (int i = 0; i < IELEN; i++)
+    {
+        printf("%d\t", pBeaconframe[i]);
+        //printf("%s", bin[strchr(hex, (char)pBeaconframe[i]) - hex]);
+        if ((i != 0) && (i % 10) == 0)
+            printf("\n");
+    }
+    printf("\n");
+    printf("******IE Information Feild***** \n \n");
+    */
+    int mcs = -1;
+    int ht40 = 0;
+    int sgi = 0;
+    //printf("[0]: %d \n", pBeaconframe[0]);
+    ht40 = (pBeaconframe[0] & mask1) >> 1;
+    //printf("HT40: %d \n", ht40);
+    memcpy(isHT40, &ht40, sizeof(ht40));
+    //SGI
+    if (ht40 >= 1) {
+        sgi = (pBeaconframe[0] & mask6) >> 6;
+    }
+    else {
+        sgi = (pBeaconframe[0] & mask5) >> 5;
+    }
+    //printf("sgi: %d \n", sgi);
+    memcpy(isSGI, &sgi, sizeof(sgi));
+
+    //if ()
+    if (IELEN > 7) {
+        //printf("mcs07: %d\n", pBeaconframe[3]);
+        //printf("mcs815: %d\n", pBeaconframe[4]);
+        //printf("mcs1623: %d\n", pBeaconframe[5]);
+        //printf("mcs2431: %d\n", pBeaconframe[6]);
+        if (pBeaconframe[6] > 0) {
+            mcs = get_HTMCSIdx(pBeaconframe[6]);
+            mcs = mcs + 24;
+        }
+        else if (pBeaconframe[5] > 0) {
+            mcs = get_HTMCSIdx(pBeaconframe[5]);
+            mcs = mcs + 16;
+        }
+        else if (pBeaconframe[4] > 0) {
+            mcs = get_HTMCSIdx(pBeaconframe[4]);
+            mcs = mcs + 8;
+        }
+        else if (pBeaconframe[3] > 0) {
+            mcs = get_HTMCSIdx(pBeaconframe[3]);
+        }
+        
+        //printf("mcs idx= %d\n", mcs);
+        memcpy(results, &mcs, sizeof(mcs));
+    }
+    //printf("######## FuncWlanHTCapa<--- ######## \n \n");
+}
+//TODO: HT information
+void
+FuncWlanHTInfo(
+    __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
+    __out int* results)
+{
+    //pHTCapa htcapa = (pHTCapa)pBeaconframe;
+    
+    printf("******IE Information Feild***** \n");
+    for (int i = 0; i < IELEN; i++)
+    {
+        printf("%d\t", pBeaconframe[i]);
+        //printf("%s", bin[strchr(hex, (char)pBeaconframe[i]) - hex]);
+        if ((i != 0) && (i % 10) == 0)
+            printf("\n");
+    }
+    printf("\n");
+    printf("******IE Information Feild***** \n \n");
+    /*
+    int mcs = -1;
+
+    //std::cout << "ampdu: " << htcapa->ampdu << "\n";
+    if (IELEN > 7) {
+        printf("mcs07: %d\n", pBeaconframe[3]);
+        printf("mcs815: %d\n", pBeaconframe[4]);
+        printf("mcs1623: %d\n", pBeaconframe[5]);
+        printf("mcs2431: %d\n", pBeaconframe[6]);
+        if (pBeaconframe[6] > 0) {
+            mcs = get_HTMCSIdx(pBeaconframe[6]);
+            mcs = mcs + 24;
+        }
+        else if (pBeaconframe[5] > 0) {
+            mcs = get_HTMCSIdx(pBeaconframe[5]);
+            mcs = mcs + 16;
+        }
+        else if (pBeaconframe[4] > 0) {
+            mcs = get_HTMCSIdx(pBeaconframe[4]);
+            mcs = mcs + 8;
+        }
+        else if (pBeaconframe[3] > 0) {
+            mcs = get_HTMCSIdx(pBeaconframe[3]);
+        }
+
+        printf("mcs idx= %d\n", mcs);
+        memcpy(results, &mcs, sizeof(mcs));
+    }
+    */
+    //printf("######## FuncWlanHTInfo<--- ######## \n \n");
+}
+//print VHT Capa
+void 
+FuncWlanVHTCapa(
+    __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
+    __out int* results)
+{
+    //printf("######## FuncWlanVHTCapa--->########  \n");
+    //printf("IE ElementID:=%d \n", IEID);
+    //printf("IE Information Length:=%d \n \n", IELEN);
+    pHTCapa htcapa = (pHTCapa)pBeaconframe;
+
+    printf("******IE Information Feild***** \n");
+    for (int i = 0; i < IELEN; i++)
+    {
+        printf("%d\t", pBeaconframe[i]);
+        //printf("%s", bin[strchr(hex, (char)pBeaconframe[i]) - hex]);
+        if ((i != 0) && (i % 10) == 0)
+            printf("\n");
+    }
+    printf("\n");
+    printf("******IE Information Feild***** \n");
+    if (IELEN >= 5) {
+        printf("mcs[0]: %d\n", pBeaconframe[0]); // 01: HT80
+        printf("mcs[1]: %d\n", pBeaconframe[1]);
+        printf("mcs[2]: %d\n", pBeaconframe[2]);
+        printf("mcs[3]: %d\n", pBeaconframe[3]); //1ss ~ 4ss
+        printf("mcs[4]: %d\n", pBeaconframe[4]); //5ss ~ 8ss
+
+        //memcpy(results, &mcs, sizeof(mcs));
+    }
+    //printf("######## FuncWlanVHTCapa<--- ######## \n");
+}
+//print IE
+void 
+FuncWlanIEPrint(
+    __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe)
+{
+    wcerr <<"######## FuncWlanIEPrint--->########  \n \n";
+    wcerr <<"IE ElementID:=" << IEID <<" \n";
+    wcerr <<"IE Information Length:=" << IELEN <<" \n \n" ;
+
+    wcerr << "******IE Information Feild***** \n";
+    for (int i = 0; i < IELEN; i++)
+    {
+        printf("%d\t", pBeaconframe[i]);
+        if ((i != 0) && (i % 10) == 0)
+            printf("\n");
+    }
+    wcerr << "\n";
+    wcerr << "******IE Information Feild***** \n \n";
+    //printf("\n \n");
+    wcerr << "######## FuncWlanIEPrint<--- ######## \n \n";
+}
+//ies parsing
+void 
+FuncWlanParseIEs(
+    __in PBYTE pBeaconframe, int SizeData,
+    __out double* rate_result)
+{
+    int len = SizeData;
+    int htidx = 0;
+    int isHT40 = 0;
+    int isSGI = 0;
+    int vhtidx = 0;
+    double datarate = 0.0;
+
+    //wcerr << "\n######## FuncWlanParseIEs--->########  \n";
+    while (len >= 2) //minimum length for ID and Length field
+    {
+
+        BYTE IEID;
+        BYTE IELEN;
+        IEID = *pBeaconframe++;
+        IELEN = *pBeaconframe++;
+        len -= 2;
+
+        if (IELEN > len)
+        {
+            //wcerr << "######## FuncWlanParseIEs IELEN>len =" << IELEN << " =" << len << "<--- ######## \n \n";
+            return;
+        }
+        switch (IEID)
+        {
+        /*
+        case IEID_INTERWORKING:
+            printf("IEID_INTERWORKING---> \n");
+            FuncWlanIEPrint(IEID, IELEN, pBeaconframe);
+            printf("IEID_INTERWORKING<--- \n");
+            break;
+        case IEID_ADVPROTOCOL:
+            printf("IEID_ADVPROTOCOL---> \n");
+            FuncWlanIEPrint(IEID, IELEN, pBeaconframe);
+            printf("IEID_ADVPROTOCOL<---  \n");
+            break;
+        case IEID_EXPBANDREQ:
+            printf("IEID_EXPBANDREQ---> \n");
+            FuncWlanIEPrint(IEID, IELEN, pBeaconframe);
+            printf("IEID_EXPBANDREQ<---  \n");
+            break;
+        case IEID_QOSMAPSET:
+            printf("IEID_QOSMAPSET---> \n");
+            FuncWlanIEPrint(IEID, IELEN, pBeaconframe);
+            printf("IEID_QOSMAPSET<---  \n");
+            break;
+        case IEID_ROAMCONS:
+            printf("IEID_ROAMCONS---> \n");
+            FuncWlanIEPrint(IEID, IELEN, pBeaconframe);
+            printf("IEID_ROAMCONS<--- \n");
+            break;
+        case IEID_EMERALERTID:
+            printf("IEID_EMERALERTID---> \n");
+            FuncWlanIEPrint(IEID, IELEN, pBeaconframe);
+            printf("IEID_EMERALERTID<---  \n");
+            break;
+        case	IEID_VENDORSPEC:
+            printf("IEID_VENDORSPEC---> \n");
+            FuncWlanIEPrint(IEID, IELEN, pBeaconframe);
+            printf("IEID_VENDORSPEC<---  \n");
+            break;
+        */
+        case IEID_HTCAPABILITIES:
+            //printf("IEID_HTCAPABILITIES---> \n");
+            FuncWlanHTCapa(IEID, IELEN, pBeaconframe, &htidx, &isHT40, &isSGI);
+            printf("IEID_HTCAPABILITIES<---idx=%d, HT40:%d, SGI:%d\n", htidx, isHT40, isSGI);
+            break;
+        case IEID_HTINFORMATION:
+            //printf("IEID_HTINFORMATION---> \n");
+            FuncWlanHTInfo(IEID, IELEN, pBeaconframe, &htidx);
+            //printf("IEID_HTINFORMATION<---  \n");
+            break;
+        case IEID_VHTOPERATION:
+            //printf("IEID_VHTOPERATION---> \n");
+            //FuncWlanVHTCapa(IEID, IELEN, pBeaconframe, &vhtidx);
+            //printf("IEID_VHTOPERATION<---idx=%d \n", vhtidx);
+            break;
+        //case IEID_HE
+        default:
+            //printf("default IE---> \n");
+            //FuncWlanIEPrint(IEID, IELEN, pBeaconframe);
+            //printf("default IE<--- \n");
+            break;
+        }
+        //printf("\n");
+        len -= IELEN;
+        pBeaconframe += IELEN;
+    }
+    if (htidx >= 0) {
+        datarate = get_HTMCSRate(htidx, isSGI, isHT40);
+        memcpy(rate_result, &datarate, sizeof(datarate));
+    }
+    //wcerr << "######## FuncWlanParseIEs <---####" << datarate << "####  \n" ;
+
+}
+//trying to print beacon or probe resp IE RAW data
+/*
+DWORD FuncWlanBeaconFrame(PWLAN_BSS_ENTRY pWlanBssEntry, PBYTE pBeaconframe)
+{
+
+    PBYTE pBlob = NULL;
+    ULONG i = 0;
+
+    printf("######## FuncWlanBeaconFrame--->######## \n \n");
+    printf("offset of IE data blob =%d \n", pWlanBssEntry->ulIeOffset);
+    printf("Size of IE data blob =%d \n", pWlanBssEntry->ulIeSize);
+    printf("MAC ADRESS for AP  %02x:%02x:%02x:%02x:%02x:%02x\n", pWlanBssEntry->dot11Bssid[0],
+        pWlanBssEntry->dot11Bssid[1],
+        pWlanBssEntry->dot11Bssid[2],
+        pWlanBssEntry->dot11Bssid[3],
+        pWlanBssEntry->dot11Bssid[4],
+        pWlanBssEntry->dot11Bssid[5]);
+    printf("BSS Type %d \n ", pWlanBssEntry->dot11BssType);
+    printf("SSID %s \n ", pWlanBssEntry->dot11Ssid.ucSSID);
+    printf("Capability of beacon %d  \n \n ", pWlanBssEntry->usCapabilityInformation);
+    //moving pointer the correct offset
+    pBlob = (PBYTE)(pWlanBssEntry)+pWlanBssEntry->ulIeOffset;
+    //IE data size
+    memcpy((void*)pBeaconframe, (void*)pBlob, pWlanBssEntry->ulIeSize);
+    
+    printf("*****Total IE data byte by byte Last Beacon and Probe Response****** \n");
+    do
+    {
+        printf("%d\t", pBeaconframe[i]);
+        i++;
+        if ((i != 0) && (i % 10) == 0)
+            printf("\n");
+
+    } while (i < pWlanBssEntry->ulIeSize);
+    printf("\n");
+    printf("*****Total IE data byte by byte Last Beacon and Probe Response****** \n \n");
+    //printf("\n \n");
+    
+    FuncWlanParseIEs(&pBeaconframe[0], pWlanBssEntry->ulIeSize);
+
+    printf("######## FuncWlanBeaconFrame <---########  \n \n");
+    return 0;
+}
+*/
 // print BSS info
+VOID PrintBssInfo(
+    __in PWLAN_BSS_ENTRY pBss, PBYTE pBeaconframe)
+{
+    WCHAR strSsid[DOT11_SSID_MAX_LENGTH + 1];
+    UINT i;
+    PBYTE pIe = NULL;
+    WLAN_RATE_SET wlanRateSet;
+    USHORT rate;
+    double rate_in_mbps;
+    if (pBss != NULL)
+    {
+        //col mode, use \t to sepelate
+        //MAC SSID CenterFrequency RSSI LinkQuality phyType
+        wcout << GetBssidString(pBss->dot11Bssid); //
+        wcout << L"\t";
+        wcout << SsidToStringW(strSsid, sizeof(strSsid) / sizeof(WCHAR), &pBss->dot11Ssid);
+        wcout << L"\t";
+        wcout << pBss->ulChCenterFrequency / 1000;
+        wcout << L"\t";
+        wcout << pBss->lRssi;
+        wcout << L"\t";
+        wcout << pBss->uLinkQuality;
+        wcout << L"\t";
+        /*
+        //https://msdn.microsoft.com/en-us/library/windows/desktop/aa370026(v=vs.85).aspx
+        //https://docs.microsoft.com/zh-tw/windows/desktop/api/wlanapi/ns-wlanapi-_wlan_rate_set
+        */
+        wlanRateSet = pBss->wlanRateSet;
+        i = wlanRateSet.uRateSetLength;
+        rate = wlanRateSet.usRateSet[i - 1];
+        //basic data rate
+        rate_in_mbps = (rate & 0x7FFF) * 0.5;
+        //TODO: get 11n/ac/ax rate
+        double datarate = 0.0;
+        PBYTE pBlob = NULL;
+        //moving pointer the correct offset
+        pBlob = (PBYTE)(pBss)+pBss->ulIeOffset;
+        //IE data size
+        memcpy((void*)pBeaconframe, (void*)pBlob, pBss->ulIeSize);
+        FuncWlanParseIEs(&pBeaconframe[0], pBss->ulIeSize, &datarate);
+        if (datarate > rate_in_mbps) {
+            rate_in_mbps = datarate;
+        }
+        wcout << rate_in_mbps;
+        wcout << L"\t";
+        wcout << GetPhyTypeString(pBss->dot11BssPhyType);
+        wcout << L"\t";
+        //TODO: parser ulIeOffset/ulIeSize
+        wcout << pBss->ulIeOffset;
+        wcout << L"\t";
+        wcout << pBss->ulIeSize;
+        wcout << endl;
+    }
+}
+
 VOID 
 PrintBssInfo(
     __in PWLAN_BSS_ENTRY pBss
@@ -3527,7 +3958,11 @@ GetBssList(
 		//wcout << L"\tWlanBssList number: " << pWlanBssList->dwNumberOfItems << endl;
         for (i = 0; i < pWlanBssList->dwNumberOfItems; i++)
         {
-            PrintBssInfo(&pWlanBssList->wlanBssEntries[i]);
+            //PrintBssInfo(&pWlanBssList->wlanBssEntries[i]);
+            PWLAN_BSS_ENTRY pWlanBssEntry = &pWlanBssList->wlanBssEntries[i];
+            void* beaconframe = malloc(pWlanBssEntry->ulIeSize);
+            PrintBssInfo(pWlanBssEntry, (PBYTE)beaconframe);
+            //FuncWlanBeaconFrame(pWlanBssEntry, (PBYTE)beaconframe);
         }
 		wcout << L"(Total: " << pWlanBssList->dwNumberOfItems << L")";
         WlanFreeMemory(pWlanBssList);
