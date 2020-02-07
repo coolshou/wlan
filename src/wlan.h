@@ -42,16 +42,20 @@ constexpr std::uint_fast8_t mask6{ 0x40 }; // hex for 0100 0000
 constexpr std::uint_fast8_t mask7{ 0x80 }; // hex for 1000 0000
 
 // Information elements
-#define IEID_HTCAPABILITIES 45
-#define IEID_HTINFORMATION  61
-#define IEID_INTERWORKING   107
-#define IEID_ADVPROTOCOL    108
-#define IEID_EXPBANDREQ     109
-#define IEID_QOSMAPSET      110
-#define IEID_ROAMCONS       111
-#define IEID_EMERALERTID    112 
-#define IEID_VHTOPERATION   192
-#define IEID_VENDORSPEC	    221	
+#define IEID_HTCAPABILITIES  45
+#define IEID_HTINFORMATION   61
+#define IEID_INTERWORKING    107
+#define IEID_ADVPROTOCOL     108
+#define IEID_EXPBANDREQ      109
+#define IEID_QOSMAPSET       110
+#define IEID_ROAMCONS        111
+#define IEID_EMERALERTID     112 
+#define IEID_VHTCAPABILITIES 191
+#define IEID_VHTOPERATION    192
+#define IEID_VENDORSPEC	     221	
+#define IEID_EXT			 255  //11ax HE
+#define EXTID_HECAPABILITIES 35
+#define EXTID_HEOPERATION    36
 
 const int DIV_HT = 8;
 const double HT_MCSRate[8][4] = { 
@@ -68,16 +72,16 @@ const double HT_MCSRate[8][4] = {
 const int DIV_VHT = 10;
 const double VHT_MCSRate[10][8] = {
 // HT20, HT20 SGI, HT40, HT40 SGI, HT80, HT80 SGI, HT160, HT160 SGI
-	{ 6.5,  7.2,  13.5,  15,  29.3,  32.5,  58.5,  65.0},
-	{13.0, 14.4,  27.0,  30,  58.5,  65.0, 117.0, 130.0},
-	{19.5, 21.7,  40.5,  45,  87.8,  97.5, 175.5, 195.0},
-	{26.0, 28.9,  54.0,  60, 117.0, 130.0, 234.0, 260.0},
-	{39.0, 43.3,  81.0,  90, 175.5, 195.0, 351.0, 390.0},
-	{52.0, 57.8, 108.0, 120, 234.0, 260.0, 468.0, 520.0},
-	{58.5, 65.0, 121.5, 135, 263.3, 292.5, 526.5, 585.0},
-	{65.0, 72.2, 135.0, 150, 292.5, 325.0, 585.0, 650.0},
-	{78.0, 86.7, 162.0, 180, 351.0, 390.0, 702.0, 780.0},
-	{ 0.0,  0.0, 180.0, 200, 390.0, 433.3, 780.0, 866.7}
+	{ 6.5,  7.2,  13.5,  15,  29.3,  32.5,  58.5,  65.0}, // 0
+	{13.0, 14.4,  27.0,  30,  58.5,  65.0, 117.0, 130.0}, // 1
+	{19.5, 21.7,  40.5,  45,  87.8,  97.5, 175.5, 195.0}, // 2
+	{26.0, 28.9,  54.0,  60, 117.0, 130.0, 234.0, 260.0}, // 3
+	{39.0, 43.3,  81.0,  90, 175.5, 195.0, 351.0, 390.0}, // 4
+	{52.0, 57.8, 108.0, 120, 234.0, 260.0, 468.0, 520.0}, // 5
+	{58.5, 65.0, 121.5, 135, 263.3, 292.5, 526.5, 585.0}, // 6
+	{65.0, 72.2, 135.0, 150, 292.5, 325.0, 585.0, 650.0}, // 7
+	{78.0, 86.7, 162.0, 180, 351.0, 390.0, 702.0, 780.0}, // 8
+	{ 0.0,  0.0, 180.0, 200, 390.0, 433.3, 780.0, 866.7} // 9
 };
 const int DIV_HE = 12;
 const double HE_MCSRate[12][12] = {
@@ -95,5 +99,9 @@ const double HE_MCSRate[12][12] = {
 	{129.0, 121.9, 109.7, 258.1, 243.8, 219.4, 540.4, 510.4, 459.4, 1080.9, 1020.8,  918.8},
 	{143.4, 135.4, 121.9, 286.8, 270.8, 243.8, 600.5, 567.1, 510.4, 1201.0, 1134.3, 1020.8}
 };
+
+#define MAX_KEY_LENGTH 255
+#define MAX_VALUE_NAME 16383
+
 
 #endif // _WLAN_H

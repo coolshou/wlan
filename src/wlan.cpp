@@ -135,6 +135,7 @@ int GetKeyData(HKEY hRootKey, LPCWSTR subKey, LPCWSTR value, LPBYTE data, DWORD 
     if(RegOpenKeyEx(hRootKey, subKey, 0, KEY_QUERY_VALUE, &hKey) != ERROR_SUCCESS)
         return 0;
     rc = RegQueryValueEx(hKey, value, NULL, NULL, data, &cbData);
+    //TODO: increase buffer size
     if( rc != ERROR_SUCCESS)
     {
         RegCloseKey(hKey);
@@ -389,45 +390,45 @@ GetPhyTypeString(
 {
     LPWSTR strRetCode;
 	wchar_t wuDot11PhyType[512];
-	wsprintfW(wuDot11PhyType, L"\"Unknown PHY type (%d)\"", uDot11PhyType);
+	wsprintfW(wuDot11PhyType, L"Unknown PHY type (%d)", uDot11PhyType);
 
     switch(uDot11PhyType)
     {
 		case dot11_phy_type_any:
-			strRetCode = L"\"any\"";
+			strRetCode = L"any";
 			break;
 		case dot11_phy_type_fhss:
-			strRetCode = L"\"FHSS\"";
+			strRetCode = L"FHSS";
 			break;
 		case dot11_phy_type_dsss:
-            strRetCode = L"\"DSSS\"";
+            strRetCode = L"DSSS";
             break;
 		case dot11_phy_type_irbaseband:
-			strRetCode = L"\"IR-base band\"";
+			strRetCode = L"IR-base band";
 			break;
 		case dot11_phy_type_ofdm:
-			strRetCode = L"\"802.11a\"";
+			strRetCode = L"802.11a";
 			break;
 		case dot11_phy_type_hrdsss:
-			strRetCode = L"\"802.11b\"";
+			strRetCode = L"802.11b";
 			break;
 		case dot11_phy_type_erp:
-            strRetCode = L"\"802.11g\"";
+            strRetCode = L"802.11g";
             break;
 		case dot11_phy_type_ht:
-			strRetCode = L"\"802.11n\"";
+			strRetCode = L"802.11n";
 			break;
 		case dot11_phy_type_vht:
-			strRetCode = L"\"802.11ac\"";
+			strRetCode = L"802.11ac";
 			break;
 		case dot11_phy_type_dmg:
-			strRetCode = L"\"802.11ad\"";
+			strRetCode = L"802.11ad";
 			break;
 		case dot11_phy_type_he://SDK 10.0.17763 (1809)
-			strRetCode = L"\"802.11ax\"";
+			strRetCode = L"802.11ax";
 			break;
         default:
-            //strRetCode = L"\"Unknown PHY type (" << wuDot11PhyType << L")\"";
+            //strRetCode = L"Unknown PHY type (" << wuDot11PhyType << L")";
 			strRetCode = wuDot11PhyType;
     }
 
@@ -765,7 +766,85 @@ GetBssidString(
 		Bssid[0], Bssid[1], Bssid[2], Bssid[3], Bssid[4], Bssid[5]);
 	return str;
 }
+double
+get_HEMCSRate(
+    __in int mcs, int sgi, int bandwidth)
+{
+    // mcs: mcs index 0~72
+    // sgi: 0: 0.8us, 1: 1.6us, 2: 3.2us (TODO)
+    // bandwidth: 0: HT20, 1: HT40, 2: HT80, 3: HT160?
+    int Division;
+    int rem;
+    double rate = 0;
+    Division = mcs / DIV_HE;
+    rem = mcs % DIV_HE;
+    int col = 0;
+    //if (sgi) 
+    {
+        col = col + 2;
+    }
+    switch (bandwidth)
+    {
+    case 3: //HT160
+        col = col + 9;
+        break;
+    case 2: //HT80
+        col = col + 6;
+        break;
+    case 1: //HT40
+        col = col + 3;
+        break;
+    default://HT20
+        //col = col + 2;
+        break;
+    }
+    //printf("\nrow=%d, col=%d\n", rem, col);
+    rate = HE_MCSRate[rem][col];
+    //printf("rate=%f, %d\n", rate, Division+1);
+    if (Division > 0) {
+        rate = rate * (Division + 1);
+    }
+    //return data rate by VHT mcs index
+    return rate;
+}
 
+double
+get_VHTMCSRate(
+    __in int mcs, int sgi, int bandwidth)
+{
+    // mcs: mcs index 0~72
+    // sgi: 0: false, 1: true
+    // bandwidth: 0: HT20/40, 1: HT80, 2: HT160, 3: HT80+80
+    int Division;
+    int rem;
+    double rate = 0;
+    Division = mcs / DIV_VHT;
+    rem = mcs % DIV_VHT;
+    int col = 0;
+    if (sgi) {
+        col = col + 1;
+    }
+    switch (bandwidth)
+    {
+        case 3: //HT80+80
+        case 2: //HT160
+            col = col + 6;
+            break;
+        case 1: //HT80
+            col = col + 4;
+            break;
+        default://HT40/20
+            col = col + 2;
+            break;
+    }
+    rate = VHT_MCSRate[rem][col];
+    //printf("rate=%f, %d\n", rate, Division+1);
+    if (Division > 0) {
+        rate = rate * (Division + 1);
+    }
+    //return data rate by VHT mcs index
+    return rate;
+}
 double 
 get_HTMCSRate(
     __in int mcs, int sgi, int bandwidth)
@@ -900,7 +979,7 @@ FuncWlanHTInfo(
 {
     //pHTCapa htcapa = (pHTCapa)pBeaconframe;
     
-    printf("******IE Information Feild***** \n");
+    printf("******FuncWlanHTInfo IE Information Feild***** \n");
     for (int i = 0; i < IELEN; i++)
     {
         printf("%d\t", pBeaconframe[i]);
@@ -909,7 +988,7 @@ FuncWlanHTInfo(
             printf("\n");
     }
     printf("\n");
-    printf("******IE Information Feild***** \n \n");
+    printf("******FuncWlanHTInfo IE Information Feild***** \n \n");
     /*
     int mcs = -1;
 
@@ -943,14 +1022,14 @@ FuncWlanHTInfo(
 }
 //print VHT Capa
 void 
-FuncWlanVHTCapa(
+FuncWlanVHTOper(
     __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
     __out int* results)
 {
-    //printf("######## FuncWlanVHTCapa--->########  \n");
+    printf("\n######## FuncWlanVHTOper--->########  \n");
     //printf("IE ElementID:=%d \n", IEID);
     //printf("IE Information Length:=%d \n \n", IELEN);
-    pHTCapa htcapa = (pHTCapa)pBeaconframe;
+    //pHTCapa htcapa = (pHTCapa)pBeaconframe;
 
     printf("******IE Information Feild***** \n");
     for (int i = 0; i < IELEN; i++)
@@ -963,13 +1042,205 @@ FuncWlanVHTCapa(
     printf("\n");
     printf("******IE Information Feild***** \n");
     if (IELEN >= 5) {
-        printf("mcs[0]: %d\n", pBeaconframe[0]); // 01: HT80
+        printf("mcs[0]: %d\n", pBeaconframe[0]); //0:HT20/40, 1: HT80, 2: HT160, 3: HT80+80
         printf("mcs[1]: %d\n", pBeaconframe[1]);
         printf("mcs[2]: %d\n", pBeaconframe[2]);
         printf("mcs[3]: %d\n", pBeaconframe[3]); //1ss ~ 4ss
         printf("mcs[4]: %d\n", pBeaconframe[4]); //5ss ~ 8ss
 
         //memcpy(results, &mcs, sizeof(mcs));
+    }
+    printf("######## FuncWlanVHTOper<--- ######## \n");
+}
+void
+FuncWlanHECapa(
+    __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
+    __out int* results, int* bandwidth)
+{
+    int ht80 = 0;
+    int ht160 = 0;
+    /*
+    printf("******IE Information Feild***** \n");
+    for (int i = 0; i < IELEN; i++)
+    {
+        printf("%d\t", pBeaconframe[i]);
+        //printf("%s", bin[strchr(hex, (char)pBeaconframe[i]) - hex]);
+        if ((i != 0) && (i % 10) == 0)
+            printf("\n");
+    }
+    printf("\n");
+    printf("******IE Information Feild***** \n");
+    */
+    int ss1 = 0;
+    int ss2 = 0;
+    int ss3 = 0;
+    int ss4 = 0;
+    int ss5 = 0;
+    int ss6 = 0;
+    int ss7 = 0;
+    int ss8 = 0;
+
+    int mcsidx = -1;
+    int bw = 0;
+    // bandwidth
+    //printf("bw: %d\n", pBeaconframe[7]);
+    ht80 = (pBeaconframe[7] & mask2)>>2; //HT40/80
+    ht160 = (pBeaconframe[7] & mask3) >> 3; //HT160
+    //TODO bandwidth
+    //printf("\nbw: %d, ht80:%d, ht160:%d\n", pBeaconframe[7], ht80, ht160);
+    if (ht160) {
+        bw = 3;
+    }
+    else if (ht80) {
+        bw = 2;
+    }
+    //else if (ht40) {
+    else {
+        bw = 1;
+    }
+    memcpy(bandwidth, &bw, sizeof(bw));
+
+    if (IELEN > 26) {
+        int TxL;
+        int TxH;
+        if (ht160) {
+            TxL = 24;
+            TxH = 25;
+        }
+        else {
+            TxL = 20;
+            TxH = 21;
+        }
+        //HT80
+        /*
+        printf("Rx mcs[18]: %d\n", pBeaconframe[18]); //Rx MCS: 1ss~4ss
+        printf("Rx mcs[19]: %d\n", pBeaconframe[19]); //Rx MCS: 5ss~8ss
+        printf("Tx mcs[20]: %d\n", pBeaconframe[20]); //Tx MCS: 1ss~4ss
+        printf("Tx mcs[21]: %d\n", pBeaconframe[21]); //Tx MCS: 5ss~8ss
+        */
+        //HT160: 
+        /*
+        printf("Tx mcs[22]: %d\n", pBeaconframe[22]); //Rx MCS: 1ss~4ss
+        printf("Tx mcs[23]: %d\n", pBeaconframe[23]); //Rx MCS: 5ss~8ss
+        printf("Tx mcs[24]: %d\n", pBeaconframe[24]); //Tx MCS: 1ss~4ss
+        printf("Tx mcs[25]: %d\n", pBeaconframe[25]); //Tx MCS: 5ss~8ss
+        */
+        ss1 = (pBeaconframe[TxL] & (mask0 | mask1));
+        //printf("1ss: %d\n", ss1);
+        ss2 = (pBeaconframe[TxL] & (mask2 | mask3)) >> 2;
+        //printf("2ss: %d\n", ss2);
+        ss3 = (pBeaconframe[TxL] & (mask4 | mask5)) >> 4;
+        //printf("3ss: %d\n", ss3);
+        ss4 = (pBeaconframe[TxL] & (mask6 | mask7)) >> 6;
+        //printf("4ss: %d\n", ss4);
+        ss5 = (pBeaconframe[TxH] & (mask0 | mask1));
+        //printf("5ss: %d\n", ss5);
+        ss6 = (pBeaconframe[TxH] & (mask2 | mask3)) >> 2;
+        //printf("6ss: %d\n", ss6);
+        ss7 = (pBeaconframe[TxH] & (mask4 | mask5)) >> 4;
+        //printf("7ss: %d\n", ss7);
+        ss8 = (pBeaconframe[TxH] & (mask6 | mask7)) >> 6;
+        //printf("8ss: %d\n", ss8);
+        if (ss1 == 2)
+            mcsidx = 11;
+        if (ss2 == 2)
+            mcsidx += 12;
+        if (ss3 == 2)
+            mcsidx += 12;
+        if (ss4 == 2)
+            mcsidx += 12;
+        if (ss5 == 2)
+            mcsidx += 12;
+        if (ss6 == 2)
+            mcsidx += 12;
+        if (ss7 == 2)
+            mcsidx += 12;
+        if (ss8 == 2)
+            mcsidx += 12;
+        //printf("he idx: %d\n", mcsidx);
+        memcpy(results, &mcsidx, sizeof(mcsidx));
+    }
+}
+
+void 
+FuncWlanVHTCapa(
+    __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
+    __out int* results, int* bandwidth)
+{
+    int ss1 = 0;
+    int ss2 = 0;
+    int ss3 = 0;
+    int ss4 = 0;
+    int ss5 = 0;
+    int ss6 = 0;
+    int ss7 = 0;
+    int ss8 = 0;
+
+    int mcsidx = -1;
+    //printf("\n######## FuncWlanVHTCapa--->########  \n");
+    //printf("IE ElementID:=%d \n", IEID);
+    //printf("IE Information Length:=%d \n \n", IELEN);
+    /*
+    printf("******IE Information Feild***** \n");
+    for (int i = 0; i < IELEN; i++)
+    {
+        printf("%d\t", pBeaconframe[i]);
+        //printf("%s", bin[strchr(hex, (char)pBeaconframe[i]) - hex]);
+        if ((i != 0) && (i % 10) == 0)
+            printf("\n");
+    }
+    printf("\n");
+    printf("******IE Information Feild***** \n");
+    */
+
+    int bw  = 0;
+    //printf("\nmcs[0]: %d\n", pBeaconframe[0]); //bit2,3: ? 1: HT80, 2: HT160, 3: HT80+80
+    bw = (pBeaconframe[0] & (mask2 | mask3))>>2;
+    //printf("bw: %d\n", bw);
+    memcpy(bandwidth, &bw, sizeof(bw));
+    //printf("mcs[1]: %d\n", pBeaconframe[1]);
+    //printf("mcs[2]: %d\n", pBeaconframe[2]);
+    //printf("mcs[3]: %d\n", pBeaconframe[3]); 
+    if (IELEN >= 10) {
+        //printf("mcs[4]: %d\n", pBeaconframe[4]); //Rx MCS
+        //printf("mcs[5]: %d\n", pBeaconframe[5]); //Rx MCS
+        //printf("mcs[8]: %d\n", pBeaconframe[8]); //Tx MCS: 1ss~4ss
+        //printf("mcs[9]: %d\n", pBeaconframe[9]); //Tx MCS: 5ss~8ss
+
+        ss1 = (pBeaconframe[8] & (mask0 | mask1));
+        //printf("1ss: %d\n", ss1);
+        ss2 = (pBeaconframe[8] & (mask2 | mask3)) >>2;
+        //printf("2ss: %d\n", ss2);
+        ss3 = (pBeaconframe[8] & (mask4 | mask5)) >>4;
+        //printf("3ss: %d\n", ss3);
+        ss4 = (pBeaconframe[8] & (mask6 | mask7)) >>6;
+        //printf("4ss: %d\n", ss4);
+        ss5 = (pBeaconframe[9] & (mask0 | mask1));
+        //printf("5ss: %d\n", ss5);
+        ss6 = (pBeaconframe[9] & (mask2 | mask3)) >> 2;
+        //printf("6ss: %d\n", ss6);
+        ss7 = (pBeaconframe[9] & (mask4 | mask5)) >> 4;
+        //printf("7ss: %d\n", ss7);
+        ss8 = (pBeaconframe[9] & (mask6 | mask7)) >> 6;
+        //printf("8ss: %d\n", ss8);
+        if (ss1 == 2)
+            mcsidx = 9;
+        if (ss2 == 2)
+            mcsidx += 10;
+        if (ss3 == 2)
+            mcsidx += 10;
+        if (ss4 == 2)
+            mcsidx += 10;
+        if (ss5 == 2)
+            mcsidx += 10;
+        if (ss6 == 2)
+            mcsidx += 10;
+        if (ss7 == 2)
+            mcsidx += 10;
+        if (ss8 == 2)
+            mcsidx += 10;
+            
+        memcpy(results, &mcsidx, sizeof(mcsidx));
     }
     //printf("######## FuncWlanVHTCapa<--- ######## \n");
 }
@@ -1001,11 +1272,16 @@ FuncWlanParseIEs(
     __out double* rate_result)
 {
     int len = SizeData;
-    int htidx = 0;
+    int htidx = -1;
     int isHT40 = 0;
+    int bw_vht = 0;
+    int bw_he = 0;
     int isSGI = 0;
-    int vhtidx = 0;
-    double datarate = 0.0;
+    int vhtidx = -1;
+    int heidx = -1;
+    double ht_datarate = 0.0;
+    double vht_datarate = 0.0;
+    double he_datarate = 0.0;
 
     //wcerr << "\n######## FuncWlanParseIEs--->########  \n";
     while (len >= 2) //minimum length for ID and Length field
@@ -1064,19 +1340,39 @@ FuncWlanParseIEs(
         case IEID_HTCAPABILITIES:
             //printf("IEID_HTCAPABILITIES---> \n");
             FuncWlanHTCapa(IEID, IELEN, pBeaconframe, &htidx, &isHT40, &isSGI);
-            printf("IEID_HTCAPABILITIES<---idx=%d, HT40:%d, SGI:%d\n", htidx, isHT40, isSGI);
+            //printf("IEID_HTCAPABILITIES<---idx=%d, HT40:%d, SGI:%d\n", htidx, isHT40, isSGI);
             break;
         case IEID_HTINFORMATION:
             //printf("IEID_HTINFORMATION---> \n");
-            FuncWlanHTInfo(IEID, IELEN, pBeaconframe, &htidx);
+            //FuncWlanHTInfo(IEID, IELEN, pBeaconframe, &htidx);
             //printf("IEID_HTINFORMATION<---  \n");
+            break;
+        case IEID_VHTCAPABILITIES:
+            FuncWlanVHTCapa(IEID, IELEN, pBeaconframe, &vhtidx, &bw_vht);
+            //printf("VHT idx: %d \n", vhtidx);
             break;
         case IEID_VHTOPERATION:
             //printf("IEID_VHTOPERATION---> \n");
-            //FuncWlanVHTCapa(IEID, IELEN, pBeaconframe, &vhtidx);
+            //FuncWlanVHTOper(IEID, IELEN, pBeaconframe, &vhtidx);
             //printf("IEID_VHTOPERATION<---idx=%d \n", vhtidx);
             break;
         //case IEID_HE
+        case IEID_EXT:
+            //FuncWlanEXTID(IEID, IELEN, pBeaconframe, &heidx);
+            DWORD extid;
+            extid = pBeaconframe[0];
+            //printf("\nextid: %d\n", extid);
+            switch (extid) {
+                case EXTID_HECAPABILITIES:
+                    FuncWlanHECapa(IEID, IELEN, pBeaconframe, &heidx, &bw_he);
+                    //printf("he idx: %d\n", heidx);
+                    break;
+                case EXTID_HEOPERATION:
+                    break;
+                default:
+                    break;
+            }
+            break;
         default:
             //printf("default IE---> \n");
             //FuncWlanIEPrint(IEID, IELEN, pBeaconframe);
@@ -1088,8 +1384,19 @@ FuncWlanParseIEs(
         pBeaconframe += IELEN;
     }
     if (htidx >= 0) {
-        datarate = get_HTMCSRate(htidx, isSGI, isHT40);
-        memcpy(rate_result, &datarate, sizeof(datarate));
+        ht_datarate = get_HTMCSRate(htidx, isSGI, isHT40);
+        //printf("ht_datarate: %f \n", ht_datarate);
+        memcpy(rate_result, &ht_datarate, sizeof(ht_datarate));
+    }
+    if (vhtidx >= 0) {
+        vht_datarate = get_VHTMCSRate(vhtidx, isSGI, bw_vht);
+        //printf("vht_datarate: %f \n", vht_datarate);
+        memcpy(rate_result, &vht_datarate, sizeof(vht_datarate));
+    }
+    if (heidx >= 0) {
+        he_datarate = get_HEMCSRate(heidx, isSGI, bw_he);
+        //printf("he_datarate: %f \n", he_datarate);
+        memcpy(rate_result, &he_datarate, sizeof(he_datarate));
     }
     //wcerr << "######## FuncWlanParseIEs <---####" << datarate << "####  \n" ;
 
@@ -2405,19 +2712,20 @@ GetDeviceList(
 	RPC_WSTR strGuid = NULL;
 
 	vector<MIB_IF_ROW2>* wlan = getDevices(NdisPhysicalMediumNative802_11); //WLAN adapters
-//see https://msdn.microsoft.com/en-us/library/windows/desktop/aa814491(v=vs.85).aspx, "PhysicalMediumType" for a full list
+    //see https://msdn.microsoft.com/en-us/library/windows/desktop/aa814491(v=vs.85).aspx, "PhysicalMediumType" for a full list
 	for (auto &row : *wlan)
 	{
 		//do some additional filtering, this needs to be changed for non-WLAN
 		if ((row.PhysicalMediumType == NdisPhysicalMediumNative802_11)) {
-      if (row.InterfaceAndOperStatusFlags.FilterInterface == false) {
-        //if (UuidToStringW(&row.InterfaceGuid, &strGuid) == RPC_S_OK) {
-        if (UuidToStringW(&row.InterfaceGuid, &strGuid) == RPC_S_OK) {
-          wcout << row.InterfaceIndex;
-          wcout << L" , GUID: " << strGuid;
-          wcout << L" , Desc: " << row.Description;
-          wcout << L" , alias: " << row.Alias;
-          wcout << endl;
+            if (row.InterfaceAndOperStatusFlags.FilterInterface == false) {
+                //if (UuidToStringW(&row.InterfaceGuid, &strGuid) == RPC_S_OK) {
+                if (UuidToStringW(&row.InterfaceGuid, &strGuid) == RPC_S_OK) {
+                  wcout << row.InterfaceIndex;
+                  wcout << L" , GUID: " << strGuid;
+                  wcout << L" , Desc: " << row.Description;
+                  wcout << L" , alias: " << row.Alias;
+                  wcout << L" , Luid: " << row.InterfaceLuid.Info.NetLuidIndex;
+                  wcout << endl;
 				}
 			}
 		}
@@ -2760,14 +3068,14 @@ GetInterfaceIndex(
 			for (i = 0; i < if_table->NumEntries; i++) {
 				if ((if_table->Table[i].Type == IF_TYPE_ETHERNET_CSMACD) || (if_table->Table[i].Type == IF_TYPE_IEEE80211)) {
 					if (if_table->Table[i].InterfaceAndOperStatusFlags.HardwareInterface 
-						&& (if_table->Table[i].OperStatus != 6)
+						&& (if_table->Table[i].OperStatus != IfOperStatusNotPresent)
 						)
 					{
 						if (if_table->Table[i].InterfaceGuid == guid)
 						{
-                //wcout << L"interface index: " << if_table->Table[i].InterfaceIndex << endl;
-                dwError = if_table->Table[i].InterfaceIndex;
-                break;
+                            //wcout << L"interface index: " << if_table->Table[i].InterfaceIndex << endl;
+                            dwError = if_table->Table[i].InterfaceIndex;
+                            break;
 						}
 					}
 				}
@@ -4357,6 +4665,12 @@ Version(
 }
 
 //register
+void QueryKey(HKEY hKey);
+DWORD
+ListReg(
+    __in int argc,
+    __in_ecount(argc) LPWSTR argv[]
+);
 DWORD
 GetReg(
     __in int argc, 
@@ -4619,6 +4933,15 @@ WLAN_COMMAND g_Commands[] = {
     },
 	//register command
     {
+        L"ListRegkeys",
+        L"lr",
+        ListReg,
+        L"List interface's all reg key and values.",
+        L"<interface GUID>",
+        TRUE,
+        L"Use EnumInterface (ei) command to get the GUID of an interface."
+    },
+    {
         L"GetRegkeyValue",
         L"gr",
         GetReg,
@@ -4686,6 +5009,275 @@ WLAN_COMMAND g_Commands[] = {
     }
 };
 
+DWORD GetInterfaceRegKey(LPWSTR guid)
+{
+    //list all sub key in HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\XXXX
+    HKEY hTestKey;
+    wstring mywstring(REG_NIC_PATH);
+    //wstring concatted_stdstr = mywstring + wcsbuf;
+    LPCWSTR concatted = mywstring.c_str();
+    DWORD result=-1;
+    LPWSTR tmpGuid;
+
+    if (RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+        concatted, 0, KEY_READ,
+        &hTestKey) == ERROR_SUCCESS)
+    {
+        TCHAR    achKey[MAX_KEY_LENGTH];   // buffer for subkey name
+        DWORD    cbName;                   // size of name string 
+        TCHAR    achClass[MAX_PATH] = TEXT("");  // buffer for class name 
+        DWORD    cchClassName = MAX_PATH;  // size of class string 
+        DWORD    cSubKeys = 0;               // number of subkeys 
+        DWORD    cbMaxSubKey;              // longest subkey size 
+        DWORD    cchMaxClass;              // longest class string 
+        DWORD    cValues;              // number of values for key 
+        DWORD    cchMaxValue;          // longest value name 
+        DWORD    cbMaxValueData;       // longest value data 
+        DWORD    cbSecurityDescriptor; // size of security descriptor 
+        FILETIME ftLastWriteTime;      // last write time 
+
+        DWORD retCode;
+        DWORD i;
+        // Get the class name and the value count. 
+        retCode = RegQueryInfoKey(
+            hTestKey,                    // key handle 
+            achClass,                // buffer for class name 
+            &cchClassName,           // size of class string 
+            NULL,                    // reserved 
+            &cSubKeys,               // number of subkeys 
+            &cbMaxSubKey,            // longest subkey size 
+            &cchMaxClass,            // longest class string 
+            &cValues,                // number of values for this key 
+            &cchMaxValue,            // longest value name 
+            &cbMaxValueData,         // longest value data 
+            &cbSecurityDescriptor,   // security descriptor 
+            &ftLastWriteTime);       // last write time 
+
+        // Enumerate the subkeys, until RegEnumKeyEx fails.
+
+        if (cSubKeys)
+        {
+            LPCWSTR regkey=L"NetCfgInstanceId";
+            wchar_t wcsbuf[5];
+            TCHAR regkeyValue[39] = { 0 };
+            DWORD regkeyValueSize = sizeof(regkeyValue);
+            int rc = 0;
+            wstring concatted_stdstr;
+            for (i = 0; i < cSubKeys; i++)
+            {
+                cbName = MAX_KEY_LENGTH;
+                retCode = RegEnumKeyEx(hTestKey, i,
+                    achKey,
+                    &cbName,
+                    NULL,
+                    NULL,
+                    NULL,
+                    &ftLastWriteTime);
+                if (retCode == ERROR_SUCCESS)
+                {
+                    //_tprintf(TEXT("(%d) %s\n"), i + 1, achKey);
+                    swprintf(wcsbuf, 5, L"%s", achKey);
+                    concatted_stdstr = mywstring + wcsbuf;
+                    LPCWSTR concatted = concatted_stdstr.c_str();
+                    //_tprintf(TEXT("%s\n"), concatted);
+                    rc = GetKeyData(HKEY_LOCAL_MACHINE, concatted, regkey, (LPBYTE)regkeyValue, regkeyValueSize);
+                    if (rc == 1) {
+                        //_tprintf(TEXT("%s\n"), regkeyValue);
+                        tmpGuid = regkeyValue;
+                        if (StrStrI(tmpGuid, guid)) {
+                            //cout << "FOUND!!" << "\n";
+                            result = i;
+                            break;
+                        }
+                    }
+                    else {
+                        //cout << "ERROR:" << concatted_stdstr.c_str() << " - " << rc << "\n";
+                    }
+                }
+            }
+        }
+    }
+
+    RegCloseKey(hTestKey);
+    return result;
+}
+
+void QueryKey(HKEY hKey, bool bSubkey)
+{
+    TCHAR    achKey[MAX_KEY_LENGTH];   // buffer for subkey name
+    DWORD    cbName;                   // size of name string 
+    TCHAR    achClass[MAX_PATH] = TEXT("");  // buffer for class name 
+    DWORD    cchClassName = MAX_PATH;  // size of class string 
+    DWORD    cSubKeys = 0;               // number of subkeys 
+    DWORD    cbMaxSubKey;              // longest subkey size 
+    DWORD    cchMaxClass;              // longest class string 
+    DWORD    cValues;              // number of values for key 
+    DWORD    cchMaxValue;          // longest value name 
+    DWORD    cbMaxValueData;       // longest value data 
+    DWORD    cbSecurityDescriptor; // size of security descriptor 
+    FILETIME ftLastWriteTime;      // last write time 
+
+    DWORD i, retCode;
+
+    TCHAR  achValue[MAX_VALUE_NAME];
+    DWORD cchValue = MAX_VALUE_NAME;
+
+    // Get the class name and the value count. 
+    retCode = RegQueryInfoKey(
+        hKey,                    // key handle 
+        achClass,                // buffer for class name 
+        &cchClassName,           // size of class string 
+        NULL,                    // reserved 
+        &cSubKeys,               // number of subkeys 
+        &cbMaxSubKey,            // longest subkey size 
+        &cchMaxClass,            // longest class string 
+        &cValues,                // number of values for this key 
+        &cchMaxValue,            // longest value name 
+        &cbMaxValueData,         // longest value data 
+        &cbSecurityDescriptor,   // security descriptor 
+        &ftLastWriteTime);       // last write time 
+
+    // Enumerate the subkeys, until RegEnumKeyEx fails.
+    if (bSubkey) {
+        if (cSubKeys)
+        {
+            printf("\nNumber of subkeys: %d\n", cSubKeys);
+
+            for (i = 0; i < cSubKeys; i++)
+            {
+                cbName = MAX_KEY_LENGTH;
+                retCode = RegEnumKeyEx(hKey, i,
+                    achKey,
+                    &cbName,
+                    NULL,
+                    NULL,
+                    NULL,
+                    &ftLastWriteTime);
+                if (retCode == ERROR_SUCCESS)
+                {
+                    _tprintf(TEXT("(%d) %s\n"), i + 1, achKey);
+                }
+            }
+        }
+    }
+
+    // Enumerate the key values. 
+
+    if (cValues)
+    {
+        //printf("\nNumber of values: %d\n", cValues);
+        LPWSTR lpData = L"";
+        DWORD sData=0;
+        DWORD dwType = 0;
+        for (i = 0, retCode = ERROR_SUCCESS; i < cValues; i++)
+        {
+            cchValue = MAX_VALUE_NAME;
+            achValue[0] = '\0';
+            retCode = RegEnumValue(hKey, i,
+                achValue,
+                &cchValue,
+                NULL,
+                &dwType,
+                NULL,
+                &sData);
+
+            if (retCode == ERROR_SUCCESS)
+            {
+                //_tprintf(TEXT("(%d) %s: %d\n"), i + 1, achValue, sData);
+                TCHAR  dataValue[MAX_VALUE_NAME];
+                LONG lResult;
+                {
+                    DWORD dwSize = MAX_VALUE_NAME;
+                    lResult = RegQueryValueEx(hKey, achValue, 0, NULL, (LPBYTE)dataValue, &dwSize);
+                    if (lResult == ERROR_SUCCESS) {
+                        //printf("%s\n", dataValue);
+                        //_tprintf(TEXT("(%d,%d):\t%s:\t%s\n"), i + 1, dwType, achValue, dataValue);
+                        //_tprintf(TEXT("(%d,%d):\t%s:\t"), i + 1, dwType, achValue);
+                        _tprintf(TEXT("%d:\t%s:\t"), i + 1, achValue);
+                        if (dwType == REG_DWORD) {
+                            if (dwSize = sizeof(DWORD)) {
+                                _tprintf(TEXT("%d\n"), dataValue[0]);
+                                //printf("(%d):0x%X\n", dwSize, dataValue[0]);
+                                //printf("%d\n", dataValue[0]);
+                            }
+                            else {
+                                _tprintf(TEXT("%d\n"), dataValue);
+                            }
+                        }
+                        else if (dwType == REG_BINARY) {
+                            printf("0x");
+                            for (DWORD j = 0; j < dwSize; j++) {
+                                //printf(("%X%X"), dataValue[j+1],dataValue[j]);
+                                printf(("%02x"), dataValue[j]);
+                            }
+                            printf("\n");
+                        }
+                        else {
+                            _tprintf(TEXT("%s\n"), dataValue);
+                        }
+                    }
+                }
+            }
+            else
+                cout << "Error: " << retCode << endl;
+
+        }
+    }
+}
+DWORD
+ListReg(
+    __in int argc,
+    __in_ecount(argc) LPWSTR argv[]
+)
+{
+    DWORD dwError = ERROR_SUCCESS;
+    LPWSTR guid;
+    GUID guidIntf;
+    //LPCWSTR regkey;
+    TCHAR regkeyValue[2] = { 0 };
+    DWORD regkeyValueSize = sizeof(regkeyValue);
+    LPWSTR regpat = 0;
+    DWORD idx;
+    int rc = 0;
+
+    if (argc != 2)
+    {
+        dwError = ERROR_INVALID_PARAMETER;
+        //__leave;
+    }
+    else {
+        // get the interface GUID
+        guid = argv[1];
+        if (UuidFromString((RPC_WSTR)guid, &guidIntf) != RPC_S_OK)
+        {
+            wcerr << L"Invalid GUID " << argv[1] << endl;
+            dwError = ERROR_INVALID_PARAMETER;
+            //__leave;
+        }
+        else {
+            // get interface index
+            idx = GetInterfaceRegKey(guid);
+            //printf("idx: %04d\n", idx); 
+            wchar_t wcsbuf[5];
+            swprintf(wcsbuf, 5, L"%04d", idx);
+            //regpath = L"SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0003";
+            wstring mywstring(REG_NIC_PATH);
+            wstring concatted_stdstr = mywstring + wcsbuf;
+            LPCWSTR concatted = concatted_stdstr.c_str();
+            HKEY hTestKey;
+            if (RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+                concatted, 0, KEY_READ,
+                &hTestKey) == ERROR_SUCCESS)
+            {
+                QueryKey(hTestKey, false);
+            }
+            RegCloseKey(hTestKey);
+        }
+    }
+    PrintErrorMsg(argv[0], dwError);
+    return dwError;
+}
+
 DWORD
 GetReg(
 	__in int argc,
@@ -4696,7 +5288,7 @@ GetReg(
 	GUID guidIntf;
 	LPCWSTR regkey;
 	TCHAR regkeyValue[2] = {0};
-  DWORD regkeyValueSize = sizeof(regkeyValue);
+    DWORD regkeyValueSize = sizeof(regkeyValue);
 	LPWSTR regpat=0;
 	DWORD idx;
   int rc=0;
