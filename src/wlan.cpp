@@ -5192,10 +5192,10 @@ void QueryKey(HKEY hKey, bool bSubkey)
                     if (lResult == ERROR_SUCCESS) {
                         //printf("%s\n", dataValue);
                         //_tprintf(TEXT("(%d,%d):\t%s:\t%s\n"), i + 1, dwType, achValue, dataValue);
-                        //_tprintf(TEXT("(%d,%d):\t%s:\t"), i + 1, dwType, achValue);
-                        _tprintf(TEXT("%d:\t%s:\t"), i + 1, achValue);
+                        _tprintf(TEXT("(%d,%d):\t%s:\t"), i + 1, dwType, achValue);
+                        //_tprintf(TEXT("%d:\t%s:\t"), i + 1, achValue);
                         if (dwType == REG_DWORD) {
-                            if (dwSize = sizeof(DWORD)) {
+                            if (dwSize == sizeof(DWORD)) {
                                 _tprintf(TEXT("%d\n"), dataValue[0]);
                                 //printf("(%d):0x%X\n", dwSize, dataValue[0]);
                                 //printf("%d\n", dataValue[0]);
@@ -5205,10 +5205,11 @@ void QueryKey(HKEY hKey, bool bSubkey)
                             }
                         }
                         else if (dwType == REG_BINARY) {
-                            printf("0x");
-                            for (DWORD j = 0; j < dwSize; j++) {
+                            //printf("0x");
+                            for (DWORD j = 0; j < (dwSize/sizeof(TCHAR)); j++) {
                                 //printf(("%X%X"), dataValue[j+1],dataValue[j]);
-                                printf(("%02x"), dataValue[j]);
+                                //printf(("%02X"), dataValue[j]);
+                                _tprintf(TEXT("%04X"), dataValue[j]);
                             }
                             printf("\n");
                         }
