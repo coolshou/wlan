@@ -770,9 +770,9 @@ double
 get_HEMCSRate(
     __in int mcs, int sgi, int bandwidth)
 {
-    // mcs: mcs index 0~72
-    // sgi: 0: 0.8us, 1: 1.6us, 2: 3.2us (TODO)
-    // bandwidth: 0: HT20, 1: HT40, 2: HT80, 3: HT160?
+    // mcs: mcs index 0~144
+    // (TODO) sgi: 0: 0.8us, 1: 1.6us, 2: 3.2us 
+    // bandwidth: 0: HT20, 1: HT40, 2: HT80, 3: HT160
     int Division;
     int rem;
     double rate = 0;
@@ -780,9 +780,9 @@ get_HEMCSRate(
     rem = mcs % DIV_HE;
     int col = 0;
     //if (sgi) 
-    {
+    /*{
         col = col + 2;
-    }
+    }*/
     switch (bandwidth)
     {
     case 3: //HT160
@@ -795,16 +795,15 @@ get_HEMCSRate(
         col = col + 3;
         break;
     default://HT20
-        //col = col + 2;
         break;
     }
     //printf("\nrow=%d, col=%d\n", rem, col);
     rate = HE_MCSRate[rem][col];
-    //printf("rate=%f, %d\n", rate, Division+1);
     if (Division > 0) {
         rate = rate * (Division + 1);
     }
-    //return data rate by VHT mcs index
+    //printf("rate=%f, %d\n", rate, Division+1);
+    //return data rate by HE mcs index
     return rate;
 }
 
@@ -1057,6 +1056,7 @@ FuncWlanHECapa(
     __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
     __out int* results, int* bandwidth)
 {
+    int ht40 = 0;
     int ht80 = 0;
     int ht160 = 0;
     /*
@@ -1084,23 +1084,25 @@ FuncWlanHECapa(
     int bw = 0;
     // bandwidth
     //printf("bw: %d\n", pBeaconframe[7]);
-    ht80 = (pBeaconframe[7] & mask2)>>2; //HT40/80
+    ht40 = (pBeaconframe[7] & mask1) >> 1; //HT40
+    ht80 = (pBeaconframe[7] & mask2)>>2; //HT80
     ht160 = (pBeaconframe[7] & mask3) >> 3; //HT160
-    //TODO bandwidth
-    //printf("\nbw: %d, ht80:%d, ht160:%d\n", pBeaconframe[7], ht80, ht160);
+    //printf("\nbw: %d, ht40:%d ht80:%d, ht160:%d\n", pBeaconframe[7], ht40, ht80, ht160);
     if (ht160) {
         bw = 3;
     }
     else if (ht80) {
         bw = 2;
     }
-    //else if (ht40) {
-    else {
+    else if (ht40) {
         bw = 1;
+    }
+    else {
+        bw = 0;
     }
     memcpy(bandwidth, &bw, sizeof(bw));
 
-    if (IELEN > 26) {
+    if (IELEN >= 24) {
         int TxL;
         int TxH;
         if (ht160) {
@@ -1111,7 +1113,7 @@ FuncWlanHECapa(
             TxL = 20;
             TxH = 21;
         }
-        //HT80
+        //HT20/HT40/HT80
         /*
         printf("Rx mcs[18]: %d\n", pBeaconframe[18]); //Rx MCS: 1ss~4ss
         printf("Rx mcs[19]: %d\n", pBeaconframe[19]); //Rx MCS: 5ss~8ss
