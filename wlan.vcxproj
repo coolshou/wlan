@@ -212,7 +212,10 @@
   <ItemGroup>
     <ClInclude Include="resource.h" />
     <ClInclude Include="src\CommandError.h" />
+    <ClInclude Include="src\he_rate.h" />
+    <ClInclude Include="src\ht_rate.h" />
     <ClInclude Include="src\version.h" />
+    <ClInclude Include="src\vht_rate.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\wlan.cpp" />

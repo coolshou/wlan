@@ -865,7 +865,7 @@ get_HTMCSRate(
     }
     rate = HT_MCSRate[rem][col];
     if (Division > 0) {
-        rate = rate * Division;
+        rate = rate * (Division + 1);
     }
     //printf("rate=%f \n", rate);
     //wcerr << "rate=" << rate << "\n";
@@ -964,7 +964,6 @@ FuncWlanHTCapa(
         else if (pBeaconframe[3] > 0) {
             mcs = get_HTMCSIdx(pBeaconframe[3]);
         }
-        
         //printf("mcs idx= %d\n", mcs);
         memcpy(results, &mcs, sizeof(mcs));
     }
