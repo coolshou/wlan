@@ -815,10 +815,10 @@ get_VHTMCSRate(
     // sgi: 0: false, 1: true
     // bandwidth: 0: HT20/40, 1: HT80, 2: HT160, 3: HT80+80
     int Division;
-    int rem;
+    int row;
     double rate = 0;
     Division = mcs / DIV_VHT;
-    rem = mcs % DIV_VHT;
+    row = mcs % DIV_VHT;
     int col = 0;
     if (sgi) {
         col = col + 1;
@@ -836,7 +836,7 @@ get_VHTMCSRate(
             col = col + 2;
             break;
     }
-    rate = VHT_MCSRate[rem][col];
+    rate = VHT_MCSRate[row][col];
     //printf("rate=%f, %d\n", rate, Division+1);
     if (Division > 0) {
         rate = rate * (Division + 1);
@@ -1022,33 +1022,36 @@ FuncWlanHTInfo(
 void 
 FuncWlanVHTOper(
     __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
-    __out int* results)
+    __out int* bandwidth)
 {
-    printf("\n######## FuncWlanVHTOper--->########  \n");
+    //printf("\n######## FuncWlanVHTOper--->########  \n");
     //printf("IE ElementID:=%d \n", IEID);
     //printf("IE Information Length:=%d \n \n", IELEN);
     //pHTCapa htcapa = (pHTCapa)pBeaconframe;
 
-    printf("******IE Information Feild***** \n");
-    for (int i = 0; i < IELEN; i++)
-    {
-        printf("%d\t", pBeaconframe[i]);
-        //printf("%s", bin[strchr(hex, (char)pBeaconframe[i]) - hex]);
-        if ((i != 0) && (i % 10) == 0)
-            printf("\n");
-    }
-    printf("\n");
-    printf("******IE Information Feild***** \n");
+    //printf("******IE Information Feild***** \n");
+    //for (int i = 0; i < IELEN; i++)
+    //{
+    //    printf("%d\t", pBeaconframe[i]);
+    //    //printf("%s", bin[strchr(hex, (char)pBeaconframe[i]) - hex]);
+    //    if ((i != 0) && (i % 10) == 0)
+    //        printf("\n");
+    //}
+    //printf("\n");
+    //printf("******IE Information Feild***** \n");
     if (IELEN >= 5) {
-        printf("mcs[0]: %d\n", pBeaconframe[0]); //0:HT20/40, 1: HT80, 2: HT160, 3: HT80+80
-        printf("mcs[1]: %d\n", pBeaconframe[1]);
-        printf("mcs[2]: %d\n", pBeaconframe[2]);
-        printf("mcs[3]: %d\n", pBeaconframe[3]); //1ss ~ 4ss
-        printf("mcs[4]: %d\n", pBeaconframe[4]); //5ss ~ 8ss
+        int bw = 0;
+        bw = (pBeaconframe[0]);
+        //printf("bw: %d\n", bw); //0:HT20/40, 1: HT80, 2: HT160, 3: HT80+80
+        memcpy(bandwidth, &bw, sizeof(bw));
+        //printf("mcs[1]: %d\n", pBeaconframe[1]);
+        //printf("mcs[2]: %d\n", pBeaconframe[2]);
+        //printf("mcs[3]: %d\n", pBeaconframe[3]); //1ss ~ 4ss
+        //printf("mcs[4]: %d\n", pBeaconframe[4]); //5ss ~ 8ss
 
         //memcpy(results, &mcs, sizeof(mcs));
     }
-    printf("######## FuncWlanVHTOper<--- ######## \n");
+    //printf("######## FuncWlanVHTOper<--- ######## \n");
 }
 void
 FuncWlanHECapa(
@@ -1194,19 +1197,23 @@ FuncWlanVHTCapa(
     printf("******IE Information Feild***** \n");
     */
 
-    int bw  = 0;
-    //printf("\nmcs[0]: %d\n", pBeaconframe[0]); //bit2,3: ? 1: HT80, 2: HT160, 3: HT80+80
-    bw = (pBeaconframe[0] & (mask2 | mask3))>>2;
+    //int bw  = 0;
+    //printf("\nmcs[0]: %d\n", pBeaconframe[0]); 
+    //bit2,3: 0:?, 1: HT80, 2: HT160, 3: HT80+80
+    //bw = (pBeaconframe[0] & (mask2 | mask3))>>2;
     //printf("bw: %d\n", bw);
-    memcpy(bandwidth, &bw, sizeof(bw));
+    //memcpy(bandwidth, &bw, sizeof(bw));
+
     //printf("mcs[1]: %d\n", pBeaconframe[1]);
     //printf("mcs[2]: %d\n", pBeaconframe[2]);
     //printf("mcs[3]: %d\n", pBeaconframe[3]); 
     if (IELEN >= 10) {
         //printf("mcs[4]: %d\n", pBeaconframe[4]); //Rx MCS
         //printf("mcs[5]: %d\n", pBeaconframe[5]); //Rx MCS
+        //pBeaconframe[6]pBeaconframe[7]  //Rx highest Long GI Rate
         //printf("mcs[8]: %d\n", pBeaconframe[8]); //Tx MCS: 1ss~4ss
         //printf("mcs[9]: %d\n", pBeaconframe[9]); //Tx MCS: 5ss~8ss
+        //pBeaconframe[10]pBeaconframe[11]  //Tx highest Long GI Rate
 
         ss1 = (pBeaconframe[8] & (mask0 | mask1));
         //printf("1ss: %d\n", ss1);
@@ -1354,8 +1361,7 @@ FuncWlanParseIEs(
             break;
         case IEID_VHTOPERATION:
             //printf("IEID_VHTOPERATION---> \n");
-            //FuncWlanVHTOper(IEID, IELEN, pBeaconframe, &vhtidx);
-            //printf("IEID_VHTOPERATION<---idx=%d \n", vhtidx);
+            FuncWlanVHTOper(IEID, IELEN, pBeaconframe, &bw_vht);
             break;
         //case IEID_HE
         case IEID_EXT:
