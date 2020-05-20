@@ -5285,8 +5285,9 @@ GetReg(
 {
 	DWORD dwError = ERROR_SUCCESS;
 	GUID guidIntf;
+    LPWSTR guid;
 	LPCWSTR regkey;
-	TCHAR regkeyValue[2] = {0};
+	TCHAR regkeyValue[256] = {0};
     DWORD regkeyValueSize = sizeof(regkeyValue);
 	LPWSTR regpat=0;
 	DWORD idx;
@@ -5298,7 +5299,8 @@ GetReg(
     //__leave;
   } else {
     // get the interface GUID
-    if (UuidFromString((RPC_WSTR)argv[1], &guidIntf) != RPC_S_OK)
+    guid = argv[1];
+    if (UuidFromString((RPC_WSTR)guid, &guidIntf) != RPC_S_OK)
     {
       wcerr << L"Invalid GUID " << argv[1] << endl;
       dwError = ERROR_INVALID_PARAMETER;
@@ -5306,9 +5308,10 @@ GetReg(
     } else {
       // get reg key name
       regkey = argv[2];
+      
       // get interface index
-      idx = GetInterfaceIndex(guidIntf);
-      //printf("%04d\n", idx); 
+      idx = GetInterfaceRegKey(guid);
+      // printf("%04d\n", idx); 
       wchar_t wcsbuf[5];
       swprintf(wcsbuf, 5, L"%04d", idx);
       //wcout << wcsbuf << endl;
@@ -5321,7 +5324,7 @@ GetReg(
       rc = GetKeyData(HKEY_LOCAL_MACHINE, concatted, regkey, (LPBYTE)regkeyValue, regkeyValueSize);
       if (rc == 1) {
         //PrintErrorMsg(regkeyValue, dwError);
-        wcout << regkeyValue << endl;
+        wcout << regkey << ":" << regkeyValue << endl;
       } else {
         dwError = rc;
       }
