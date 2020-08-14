@@ -4,7 +4,7 @@
 #define _HT_RATE_H
 
 const int DIV_HT = 8;
-const double HT_MCSRate[10][4] = {
+const double HT_MCSRate[12][4] = {
 	// HT20, HT20 SGI, HT40, HT40 SGI
 		{ 6.5,  7.2,  13.5,  15}, //0, BPSK
 		{13.0, 14.4,  27.0,  30}, //1, 	QPSK 
@@ -15,7 +15,9 @@ const double HT_MCSRate[10][4] = {
 		{58.5, 65.0, 121.5, 135}, //6, 	64-QAM 
 		{65.0, 72.2, 135.0, 150}, //7, 	64-QAM 
 		{78.0, 86.7, 162.0, 180}, //8, 	256-QAM  (non-standard)
-		{ 0.0,  0.0, 180.0, 200} //9, 	256-QAM  (non-standard)
+		{ 0.0,  0.0, 180.0, 200}, //9, 	256-QAM  (non-standard)
+		{ 0.0,  0.0, 202.5, 225}, //10,	1024-QAM  (non-standard)
+		{ 0.0,  0.0, 225.0, 250} //11, 	1024-QAM  (non-standard)
 };
 
 
