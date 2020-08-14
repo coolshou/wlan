@@ -3,7 +3,7 @@
 #ifndef _HT_RATE_H
 #define _HT_RATE_H
 
-const int DIV_HT = 10;
+const int DIV_HT = 8;
 const double HT_MCSRate[10][4] = {
 	// HT20, HT20 SGI, HT40, HT40 SGI
 		{ 6.5,  7.2,  13.5,  15}, //0, BPSK
