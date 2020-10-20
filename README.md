@@ -55,3 +55,4 @@ The following commands are available. Use "help xyz" to show the description of 
 # Note:
 	Win10 1809(SDK 10.0.17763) add 11ax phy: "dot11_phy_type_he"
 	Win10 1903(SDK 10.0.18362) add WPA3: DOT11_AUTH_ALGO_WPA3 & DOT11_AUTH_ALGO_WPA3_SAE
+	Win10 2004(SDK 10.0.19041) add WPA3 Opportunistic Wireless Encryption: DOT11_AUTH_ALGO_OWE
