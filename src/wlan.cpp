@@ -522,6 +522,7 @@ GetAuthAlgoString(
 		case DOT11_AUTH_ALGO_WPA3_SAE: //SDK 10.0.18326 (1903)
 			strRetCode = L"\"WPA3-Personal\"";
 			break;
+            //DOT11_AUTH_ALGO_OWE (1909)
         default:
             if (dot11AuthAlgo & DOT11_AUTH_ALGO_IHV_START)
             {
