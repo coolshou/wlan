@@ -1088,7 +1088,7 @@ FuncWlanHECapa(
     // bandwidth
     //printf("bw: %d\n", pBeaconframe[7]);
     ht40 = (pBeaconframe[7] & mask1) >> 1; //HT40
-    ht80 = (pBeaconframe[7] & mask2)>>2; //HT80
+    ht80 = (pBeaconframe[7] & mask2) >> 2; //HT80
     ht160 = (pBeaconframe[7] & mask3) >> 3; //HT160
     //printf("\nbw: %d, ht40:%d ht80:%d, ht160:%d\n", pBeaconframe[7], ht40, ht80, ht160);
     if (ht160) {
@@ -1373,7 +1373,7 @@ FuncWlanParseIEs(
             switch (extid) {
                 case EXTID_HECAPABILITIES:
                     FuncWlanHECapa(IEID, IELEN, pBeaconframe, &heidx, &bw_he);
-                    //printf("he idx: %d\n", heidx);
+                    //printf("he idx: %d, %d\n", heidx, bw_he);
                     break;
                 case EXTID_HEOPERATION:
                     break;
@@ -3509,6 +3509,123 @@ GetRSSI(
 	PrintErrorMsg(argv[0], dwError);
 	return dwError;
 }
+// 
+#define MALLOC(x) HeapAlloc(GetProcessHeap(), 0, (x))
+#define FREE(x) HeapFree(GetProcessHeap(), 0, (x))
+#define MAX_TRIES 3
+DWORD
+GetMac(
+    __in int argc,
+    __in_ecount(argc) LPWSTR argv[]
+)
+{
+    DWORD dwError = ERROR_SUCCESS;
+    GUID guidIntf;
+
+    unsigned int i = 0;
+    DWORD dwRetVal = 0;
+    // default to unspecified address family (both)
+    ULONG family = AF_UNSPEC;
+    // Set the flags to pass to GetAdaptersAddresses
+    ULONG flags = GAA_FLAG_INCLUDE_PREFIX;
+    PIP_ADAPTER_ADDRESSES pAddresses = NULL;
+    ULONG outBufLen = 0;
+    ULONG Iterations = 0;
+    PIP_ADAPTER_ADDRESSES pCurrAddresses = NULL;
+    LPVOID lpMsgBuf = NULL;
+
+    __try
+    {
+        if (argc != 2)
+        {
+            dwError = ERROR_INVALID_PARAMETER;
+            __leave;
+        }
+        // get the interface GUID
+        if (UuidFromString((RPC_WSTR)argv[1], &guidIntf) != RPC_S_OK)
+        {
+            wcerr << L"Invalid GUID " << argv[1] << endl;
+            dwError = ERROR_INVALID_PARAMETER;
+            __leave;
+        }
+        do {
+            pAddresses = (IP_ADAPTER_ADDRESSES*)MALLOC(outBufLen);
+            if (pAddresses == NULL) {
+                printf
+                ("Memory allocation failed for IP_ADAPTER_ADDRESSES struct\n");
+                exit(1);
+            }
+            dwRetVal = GetAdaptersAddresses(family, flags, NULL, pAddresses, &outBufLen);
+            if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
+                FREE(pAddresses);
+                pAddresses = NULL;
+            }
+            else {
+                break;
+            }
+            Iterations++;
+        } while ((dwRetVal == ERROR_BUFFER_OVERFLOW) && (Iterations < MAX_TRIES));
+        wchar_t szGUID[64] = { 0 };
+        StringFromGUID2(guidIntf, szGUID, 64);
+        size_t wcsChars = wcslen(szGUID);
+        size_t sizeRequired = WideCharToMultiByte(CP_ACP, 0, szGUID, -1, NULL, 0, NULL, NULL);
+        char* szTo = new char[sizeRequired + 1];
+        sizeRequired = WideCharToMultiByte(CP_ACP, 0, szGUID, -1, szTo, (int)sizeRequired, NULL, NULL);
+        //wcout << L"guid:" << szGUID << "====" << szTo << endl;
+        if (dwRetVal == NO_ERROR) {
+            // If successful, output some information from the data we received
+            pCurrAddresses = pAddresses;
+            while (pCurrAddresses) {
+                //wcout << L"\tAdapter name: " << pCurrAddresses->AdapterName << endl;
+                if (strcmp(szTo , pCurrAddresses->AdapterName)==0) {
+                    //wcout << L"\tDescription: " << pCurrAddresses->Description << endl;
+                    if (pCurrAddresses->PhysicalAddressLength != 0) {
+                        wcout << L"MAC: ";
+                        for (i = 0; i < (int)pCurrAddresses->PhysicalAddressLength;
+                            i++) {
+                            if (i == (pCurrAddresses->PhysicalAddressLength - 1))
+                                printf("%.2X", (int)pCurrAddresses->PhysicalAddress[i]);
+                            else
+                                printf("%.2X:", (int)pCurrAddresses->PhysicalAddress[i]);
+                        }
+                    }
+                    wcout << endl;
+                    break;
+                }
+                pCurrAddresses = pCurrAddresses->Next;
+            }
+        }
+        else {
+            //printf("Call to GetAdaptersAddresses failed with error: %d\n", dwRetVal);
+            wcerr << L"Call to GetAdaptersAddresses failed with error:" << dwRetVal << endl;
+            if (dwRetVal == ERROR_NO_DATA)
+                //printf("\tNo addresses were found for the requested parameters\n");
+            wcerr << L"\tNo addresses were found for the requested parameters" << endl;
+            else {
+                if (FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                    FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                    NULL, dwRetVal, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                    // Default language
+                    (LPTSTR)&lpMsgBuf, 0, NULL)) {
+                    //printf("\tError: %s", lpMsgBuf);
+                    wcerr << L"\tError: " << lpMsgBuf << endl;
+                    LocalFree(lpMsgBuf);
+                    if (pAddresses)
+                        FREE(pAddresses);
+                    exit(1);
+                }
+            }
+        }
+    }
+    __finally
+    {
+        if (pAddresses) {
+            FREE(pAddresses);
+        }
+    }
+    PrintErrorMsg(argv[0], dwError);
+    return dwError;
+}
 // query interface connection state
 DWORD
 State(
@@ -4939,6 +5056,15 @@ WLAN_COMMAND g_Commands[] = {
 		TRUE,
 		L"Use EnumInterface (ei) command to get the GUID of an interface."
     },
+    {
+        L"GetMac",
+        L"mac",
+        GetMac,
+        L"Get Mac address of an interface.",
+        L"<interface GUID>",
+        TRUE,
+        L"Use EnumInterface (ei) command to get the GUID of an interface."
+    },
 	//register command
     {
         L"ListRegkeys",
@@ -5170,7 +5296,6 @@ void QueryKey(HKEY hKey, bool bSubkey)
     }
 
     // Enumerate the key values. 
-
     if (cValues)
     {
         LPWSTR lpData = L"";
