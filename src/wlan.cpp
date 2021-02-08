@@ -3733,11 +3733,11 @@ State(
 			pCurrentNetwork->isState == wlan_interface_state_discovering ||
 			pCurrentNetwork->isState == wlan_interface_state_authenticating
 			)
-			wcout << L"\tCurrently connecting to \"";
-
+		wcout << L"\tCurrently connecting to \"";
 		wcout << SsidToStringW(strSsid, sizeof(strSsid) / sizeof(WCHAR), &pCurrentNetwork->wlanAssociationAttributes.dot11Ssid);
 		wcout << L"\" using profile \"" << pCurrentNetwork->strProfileName << "\"" << endl;
 		wcout << L"\tconnection mode: " << GetConnectionModeString(pCurrentNetwork->wlanConnectionMode) << endl;
+        wcout << L"\tSSID: " << strSsid << endl;
 		wcout << L"\tBSS type: " << GetBssTypeString(pCurrentNetwork->wlanAssociationAttributes.dot11BssType) << endl;
 		if (pCurrentNetwork->isState == wlan_interface_state_connected) {
 			wcout << L"\tBSSID: " << GetBssidString(pCurrentNetwork->wlanAssociationAttributes.dot11Bssid) << endl;
