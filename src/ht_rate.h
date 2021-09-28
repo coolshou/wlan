@@ -1,3 +1,4 @@
+// 802.11n High Throughput
 #pragma once
 
 #ifndef _HT_RATE_H

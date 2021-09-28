@@ -1,3 +1,4 @@
+// 802.11ax High-Efficiency
 #pragma once
 
 #ifndef _HE_RATE_H

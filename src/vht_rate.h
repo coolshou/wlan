@@ -1,3 +1,4 @@
+// 802.11ac Very High Throughput
 #pragma once
 
 #ifndef _VHT_RATE_H
