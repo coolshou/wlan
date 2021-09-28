@@ -175,7 +175,27 @@ void BytesArrayToString(const BYTE *bIn, char *strOut, const UINT bLen)
 //
 // Utility functions
 //
-
+int freqTochannel(__in ULONG freq)
+{
+    int channel=0;
+    if ((freq >= 57240) && (freq <= 70200)) {    // # 60G
+        channel = (freq - 58320) / 2160 + 1;
+    }
+    else if ((freq >= 5925) && (freq <= 7125)) { // : # 6G
+       //# 6G, 5.925~7.125, 5955 = ch1, 5975 = ch5
+        channel = (freq - 5950) / 5;
+    }
+    else if ((freq >= 5180) && (freq <= 5825)) { // : # 5G
+        channel = (freq - 5150) / 5 + 30;
+    }
+    else if ((freq >= 2412) && (freq <= 2477)) { // : # 2.4G
+        channel = (freq - 2412) / 5 + 1;
+    }
+    else {
+        wcout << "Can not conver frequence " << freq  << " to channel" << endl;
+    }
+    return channel;
+}
 // get interface state string
 LPWSTR
 GetInterfaceStateString(
@@ -3145,7 +3165,7 @@ GetChannel(
             //wcout << L"Win10"  << endl;
             PWLAN_CONNECTION_ATTRIBUTES pCurrentNetwork = NULL;
 
-            //get connected bssid
+            //get connected channel
             dwError = WlanQueryInterface(
                 hClient,
                 &guidIntf,
@@ -3348,6 +3368,9 @@ GetRSSI(
 	PDOT11_SSID pDot11Ssid = NULL;
 	DOT11_MAC_ADDRESS dot11Bssid = { 0 };
 	PDOT11_MAC_ADDRESS pDot11Bssid = NULL;
+    int apchannel;
+    ULONG* channel = NULL;
+    DWORD dwSizeChannel = sizeof(*channel);
 	__try
 	{
 		if ((argc != 2)&&(argc != 3))
@@ -3385,6 +3408,8 @@ GetRSSI(
 		}
 		if (OSMajor >= 10) {
 			//wcout << L"Win10"  << endl;
+            //get connected channel
+            
 			PWLAN_CONNECTION_ATTRIBUTES pCurrentNetwork = NULL;
 			PUCHAR bssid;
 			//get connected bssid
@@ -3402,8 +3427,24 @@ GetRSSI(
 			{
 				pCurrentNetwork = (PWLAN_CONNECTION_ATTRIBUTES)pData;
 				bssid = pCurrentNetwork->wlanAssociationAttributes.dot11Bssid;
-				//wcout << "BSSID: " << GetBssidString(pCurrentNetwork->wlanAssociationAttributes.dot11Bssid) << endl;
-
+                //wcout << "BSSID: " << GetBssidString(bssid) << endl;
+                
+                dwError = WlanQueryInterface(
+                    hClient,
+                    &guidIntf,
+                    wlan_intf_opcode_channel_number,
+                    NULL,                       // reserved
+                    &dwSizeChannel,
+                    (PVOID*)&channel,
+                    NULL                        // not interesed in the type of the opcode value
+                );
+                if (dwError != ERROR_SUCCESS) {
+                    wcout << L"Can not get channel (" << dwError << ")" << endl;
+                    __leave;
+                }
+                else {
+                    //wcout << "channel:" << *channel << endl;
+                }
 			}
 			else {
 				wcout << L"Not connected" << endl;
@@ -3433,7 +3474,9 @@ GetRSSI(
 					PUCHAR tBssid;
 					if (pBss != NULL) {
 						tBssid = pBss->dot11Bssid;
-						if (*bssid == *tBssid) {
+                        apchannel = freqTochannel(pBss->ulChCenterFrequency/1000);
+                        //wcout << L"BSSID:" << GetBssidString(tBssid) << " freq:" << apchannel << endl;
+						if ((*bssid == *tBssid) && (apchannel == *channel)) {
 							iRssi = pBss->lRssi;
 							break;
 						}
@@ -4790,7 +4833,7 @@ Version(
 }
 
 //register
-void QueryKey(HKEY hKey);
+void QueryKey(HKEY hKey, bool bSubkey);
 DWORD
 ListReg(
     __in int argc,
@@ -5329,6 +5372,7 @@ void QueryKey(HKEY hKey, bool bSubkey)
                             }
                             else {
                                 _tprintf(TEXT("%d\n"), dataValue);
+                                //wcout << L"dataValue" << endl;
                             }
                         }
                         else if (dwType == REG_BINARY) {
