@@ -1,4 +1,4 @@
-//IEEE 802.11be Extremely High Throughput 
+//IEEE 802.11be (WiFi 7) Extremely High Throughput 
 #pragma once
 
 #ifndef _EHT_RATE_H
