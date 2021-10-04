@@ -1,4 +1,4 @@
-// 802.11ax High-Efficiency
+// 802.11ax (Wifi 6) High-Efficiency
 #pragma once
 
 #ifndef _HE_RATE_H
