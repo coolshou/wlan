@@ -536,13 +536,16 @@ GetAuthAlgoString(
         case DOT11_AUTH_ALGO_RSNA_PSK:
             strRetCode = L"\"WPA2-Personal\"";
             break;
-		case DOT11_AUTH_ALGO_WPA3: //SDK 10.0.18326 (1903)
-			strRetCode = L"\"WPA3-Enterprise\"";
-			break;
-		case DOT11_AUTH_ALGO_WPA3_SAE: //SDK 10.0.18326 (1903)
-			strRetCode = L"\"WPA3-Personal\"";
-			break;
-            //DOT11_AUTH_ALGO_OWE (1909)
+        case DOT11_AUTH_ALGO_WPA3: //SDK 10.0.18326 (1903)
+            strRetCode = L"\"WPA3-Enterprise\"";
+            break;
+        case DOT11_AUTH_ALGO_WPA3_SAE: //SDK 10.0.18326 (1903)
+            strRetCode = L"\"WPA3-Personal\"";
+            break;
+        case DOT11_AUTH_ALGO_OWE: //SDK (1909)
+            strRetCode = L"\"Enhanced-Open\"";
+            break;
+            //# DOT11_AUTH_ALGO_WPA3_ENT  //SDK 10.0.22000 (windows 11?)
         default:
             if (dot11AuthAlgo & DOT11_AUTH_ALGO_IHV_START)
             {
@@ -2444,6 +2447,7 @@ GetProfileList(
                             &hClient
                             )) != ERROR_SUCCESS)
         {
+            wcerr << L"error open handle" << endl;
             __leave;
         }
         
@@ -2456,6 +2460,12 @@ GetProfileList(
                             &pProfileList
                             )) != ERROR_SUCCESS)
         {
+            if (dwError == ERROR_INVALID_PARAMETER) {
+                wcerr << L"WlanGetProfileList: The parameter is incorrect" << endl;
+            }
+            else {
+                wcerr << L"ERROR WlanGetProfileList (" << dwError << ")" << endl;
+            }
             __leave;
         }
 
@@ -3154,10 +3164,9 @@ GetChannel(
         }
 
         // open handle
-        if ((dwError = OpenHandleAndCheckVersion(
-            &hClient
-        )) != ERROR_SUCCESS)
+        if ((dwError = OpenHandleAndCheckVersion(&hClient)) != ERROR_SUCCESS)
         {
+            wcerr << L"ERROR OpenHandleAndCheckVersion: " << dwError << endl;
             __leave;
         }
 
@@ -3179,7 +3188,78 @@ GetChannel(
             {
                 //pCurrentNetwork = (PWLAN_CONNECTION_ATTRIBUTES)pData;
                 //bssid = pCurrentNetwork->wlanAssociationAttributes.dot11Bssid;
-                wcout << "Channel: " << *channel << endl;
+                if (*channel == 0) {
+                    //wcerr << "did not get channel, use netsh wlan show networks mode=bssid to parser channel" << endl;
+                    //get connected bssid
+                    PVOID pData = NULL;
+                    PUCHAR bssid;
+                    dwError = WlanQueryInterface(
+                        hClient,
+                        &guidIntf,
+                        wlan_intf_opcode_current_connection,
+                        NULL,                       // reserved
+                        &dwDataSize,
+                        &pData,
+                        NULL                        // not interesed in the type of the opcode value
+                    );
+                    if (dwError == ERROR_SUCCESS &&
+                        dwDataSize == sizeof(WLAN_CONNECTION_ATTRIBUTES))
+                    {
+                        pCurrentNetwork = (PWLAN_CONNECTION_ATTRIBUTES)pData;
+                        bssid = pCurrentNetwork->wlanAssociationAttributes.dot11Bssid;
+                        //wcout << "BSSID: " << GetBssidString(bssid) << endl;
+                    }
+                    else {
+                        wcout << L"Not connected" << endl;
+                        __leave;
+                    }
+
+                    DOT11_BSS_TYPE dot11BssType = dot11_BSS_type_any;
+                    BOOL bSecurityEnabled = TRUE;
+                    PWLAN_BSS_LIST pWlanBssList = NULL;
+                    dwError = WlanGetNetworkBssList(
+                        hClient,
+                        &guidIntf,
+                        NULL,
+                        dot11BssType,
+                        bSecurityEnabled,
+                        NULL,                       // reserved
+                        &pWlanBssList
+                    );
+                    if (dwError == ERROR_SUCCESS) {
+                        PUCHAR tBssid;
+                        PWLAN_BSS_ENTRY pBss = NULL;
+                        DWORD i = 0;
+                        int apchannel = 0;
+                        for (i = 0; i < pWlanBssList->dwNumberOfItems; i++)
+                        {
+                            pBss = &pWlanBssList->wlanBssEntries[i];
+                            if (pBss != NULL) {
+                                tBssid = pBss->dot11Bssid;
+                                if (*bssid == *tBssid) {
+                                    //wcerr << "bssid: " << GetBssidString(bssid) << "  tbssid: " << GetBssidString(tBssid) << endl;
+                                    apchannel = freqTochannel(pBss->ulChCenterFrequency / 1000);
+                                    break;
+                                }
+                            }
+
+                        }
+                        if (apchannel) {
+                            wcout << "Channel: " << apchannel << endl;
+                        }
+                        else {
+                            wcout << "Not found Channel: " << apchannel << endl;
+                        }
+                    }
+                    else {
+                        wcerr << "WlanGetNetworkBssList error:" << dwError << endl;
+                        __leave;
+                    }
+                
+                }
+                else {
+                    wcout << "Channel: " << *channel << endl;
+                }
             }
             else {
                 wcout << L"Not connected" << endl;
@@ -3368,7 +3448,7 @@ GetRSSI(
 	PDOT11_SSID pDot11Ssid = NULL;
 	DOT11_MAC_ADDRESS dot11Bssid = { 0 };
 	PDOT11_MAC_ADDRESS pDot11Bssid = NULL;
-    int apchannel;
+    int apchannel=0;
     ULONG* channel = NULL;
     DWORD dwSizeChannel = sizeof(*channel);
 	__try
@@ -3443,7 +3523,10 @@ GetRSSI(
                     __leave;
                 }
                 else {
-                    //wcout << "channel:" << *channel << endl;
+                    if (*channel == 0) { 
+                        //windows 11, 10.0.22000.258 may not get channel value by wlan_intf_opcode_channel_number on linksys WUS6100M
+                        //wcerr << "ERROR channel:" << *channel << endl;
+                    }
                 }
 			}
 			else {
@@ -3476,7 +3559,8 @@ GetRSSI(
 						tBssid = pBss->dot11Bssid;
                         apchannel = freqTochannel(pBss->ulChCenterFrequency/1000);
                         //wcout << L"BSSID:" << GetBssidString(tBssid) << " freq:" << apchannel << endl;
-						if ((*bssid == *tBssid) && (apchannel == *channel)) {
+						//if ((*bssid == *tBssid) && (apchannel == *channel)) {
+                        if ((*bssid == *tBssid) && (apchannel)) {
 							iRssi = pBss->lRssi;
 							break;
 						}
@@ -3485,8 +3569,13 @@ GetRSSI(
 				}
 				if (iRssi > -200) {
 					wcout << L"RSSI: " << iRssi << endl;
-				}
+                }
+                else {
+                    wcout << L"Did not found BSSID:" << GetBssidString(bssid) <<" at channel: " << apchannel << "= " << *channel << endl;
+                    __leave;
+                }
 			}else{
+                wcout << L"WlanGetNetworkBssList Fail:" << dwError << endl;
 				__leave;
 			}
 		}
@@ -3501,6 +3590,7 @@ GetRSSI(
 				NULL                        // not interesed in the type of the opcode value
 			);
 			if (dwError != ERROR_SUCCESS) {
+                wcout << L"WlanQueryInterface state Fail:" << dwError << endl;
 				__leave;
 			}
 			else {
@@ -3523,11 +3613,13 @@ GetRSSI(
 					}
 					else
 					{
+                        wcout << L"WlanQueryInterface rssi Fail:" << dwError << endl;
 						__leave;
 					}
 				}
 				else {
 					wcout << L"State: " << GetInterfaceStateString(isState) << endl;
+                    __leave;
 				}
 			}
 		}
@@ -5371,7 +5463,7 @@ void QueryKey(HKEY hKey, bool bSubkey)
                                 _tprintf(TEXT("%d\n"), dataValue[0]);
                             }
                             else {
-                                _tprintf(TEXT("%d\n"), dataValue);
+                                _tprintf(TEXT("%s\n"), dataValue);
                                 //wcout << L"dataValue" << endl;
                             }
                         }
