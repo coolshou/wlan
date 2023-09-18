@@ -433,19 +433,22 @@ GetPhyTypeString(
 			strRetCode = L"802.11b";
 			break;
 		case dot11_phy_type_erp:
-            strRetCode = L"802.11g";
-            break;
+            		strRetCode = L"802.11g"; //Wifi 3
+            		break;
 		case dot11_phy_type_ht:
-			strRetCode = L"802.11n";
+			strRetCode = L"802.11n"; //Wifi 4
 			break;
 		case dot11_phy_type_vht:
-			strRetCode = L"802.11ac";
+			strRetCode = L"802.11ac"; //Wifi 5
 			break;
 		case dot11_phy_type_dmg:
 			strRetCode = L"802.11ad";
 			break;
 		case dot11_phy_type_he://SDK 10.0.17763 (1809)
-			strRetCode = L"802.11ax";
+			strRetCode = L"802.11ax"; //Wifi 6
+			break;
+	    	case dot11_phy_type_eht://SDK ?
+			strRetCode = L"802.11be"; //Wifi 7
 			break;
         default:
             //strRetCode = L"Unknown PHY type (" << wuDot11PhyType << L")";
