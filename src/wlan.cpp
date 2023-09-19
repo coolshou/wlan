@@ -447,7 +447,7 @@ GetPhyTypeString(
 		case dot11_phy_type_he://SDK 10.0.17763 (1809)
 			strRetCode = L"802.11ax"; //Wifi 6
 			break;
-	    	case dot11_phy_type_eht://SDK ?
+	    	case dot11_phy_type_eht://SDK 10.1.22621.1778 (Win11 22H2)
 			strRetCode = L"802.11be"; //Wifi 7
 			break;
         default:
