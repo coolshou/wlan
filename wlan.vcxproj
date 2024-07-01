@@ -180,6 +180,7 @@
       <TreatWarningAsError>false</TreatWarningAsError>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <SuppressStartupBanner>true</SuppressStartupBanner>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <AdditionalDependencies>wlanapi.lib;rpcrt4.lib;msxml6.lib;Iphlpapi.lib;Setupapi.lib;iphlpapi.lib;Setupapi.lib;Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -212,6 +213,7 @@
   <ItemGroup>
     <ClInclude Include="resource.h" />
     <ClInclude Include="src\CommandError.h" />
+    <ClInclude Include="src\eht_rate.h" />
     <ClInclude Include="src\he_rate.h" />
     <ClInclude Include="src\ht_rate.h" />
     <ClInclude Include="src\version.h" />
