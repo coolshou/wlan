@@ -49,8 +49,11 @@ The following commands are available. Use "help xyz" to show the description of 
         version(ver)
         help(?)
 ```
+# ei require WlanSvc started
+
 # reference
   https://msdn.microsoft.com/en-us/library/windows/desktop/ms706275(v=vs.85).aspx
+
 
 # Note:
 	Win10 1809(SDK 10.0.17763) add 11ax phy: "dot11_phy_type_he"
