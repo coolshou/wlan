@@ -10,7 +10,8 @@ Date:
     08/22/2006  modified
 	05/02/2017  add 11n/11ac
 	01/02/2019  add 11ad/11ax
-	
+	01/16/2024  add 11be
+
 Environment:
    User mode only
 --*/
@@ -433,8 +434,8 @@ GetPhyTypeString(
 			strRetCode = L"802.11b";
 			break;
 		case dot11_phy_type_erp:
-            		strRetCode = L"802.11g"; //Wifi 3
-            		break;
+      		strRetCode = L"802.11g"; //Wifi 3
+       		break;
 		case dot11_phy_type_ht:
 			strRetCode = L"802.11n"; //Wifi 4
 			break;
@@ -447,7 +448,7 @@ GetPhyTypeString(
 		case dot11_phy_type_he://SDK 10.0.17763 (1809)
 			strRetCode = L"802.11ax"; //Wifi 6
 			break;
-	    	case dot11_phy_type_eht://SDK 10.1.22621.1778 (Win11 22H2)
+	    case dot11_phy_type_eht://SDK 10.1.22621.1778 (Win11 22H2)
 			strRetCode = L"802.11be"; //Wifi 7
 			break;
         default:
@@ -793,6 +794,47 @@ GetBssidString(
 		Bssid[0], Bssid[1], Bssid[2], Bssid[3], Bssid[4], Bssid[5]);
 	return str;
 }
+double 
+get_EHTMCSRate(
+__in int mcs, int sgi, int bandwidth, int iSS)
+{
+    // mcs: mcs index 0~144
+    // (TODO) sgi: 0: 0.8us, 1: 1.6us, 2: 3.2us 
+    // bandwidth: 0: HT20, 1: HT40, 2: HT80, 3: HT160, 4: HT320
+    int rem;
+    double rate = 0;
+    rem = mcs / DIV_EHT;
+    int col = 0;
+    //if (sgi) 
+    /*{
+        col = col + 2;
+    }*/
+    switch (bandwidth)
+    {
+        case 4: //HT320
+            col = col + 12;
+            break;
+        case 3: //HT160
+            col = col + 9;
+            break;
+        case 2: //HT80
+            col = col + 6;
+            break;
+        case 1: //HT40
+            col = col + 3;
+            break;
+        default://HT20
+            break;
+    }
+    rate = EHT_MCSRate[rem][col];
+    //printf("\nbandwidth=%d, iSS=%d, row=%d, col=%d, rate=%f\n", bandwidth, iSS, rem, col, rate);
+    if (rem > 0) {
+        rate = rate * iSS;
+    }
+    //printf("rate=%f, %d\n", rate, Division+1);
+    //return data rate by HE mcs index
+    return rate;
+}
 double
 get_HEMCSRate(
     __in int mcs, int sgi, int bandwidth)
@@ -1081,6 +1123,139 @@ FuncWlanVHTOper(
     //printf("######## FuncWlanVHTOper<--- ######## \n");
 }
 void
+FuncWlanEHTCapa(
+    __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
+    __out int* results, int* bandwidth, int* iSS)
+{
+    int eht40 = 0; //TODO?
+    int eht80 = 0;
+    int eht160 = 0;
+    int eht320 = 0;
+    int rs = 0;
+    int ts = 0;
+    /*
+    printf("******EHTCapa Information Feild (%d)***** \n", IELEN);
+    for (int i = 0; i < IELEN; i++)
+    {
+        printf("%d\t", pBeaconframe[i]);
+        //printf("%s", bin[strchr(hex, (char)pBeaconframe[i]) - hex]);
+        if ((i != 0) && (i % 10) == 0)
+            printf("\n");
+    }
+    printf("\n");
+    printf("******END EHTCapa Information Feild***** \n");
+    /*/
+    int ss1 = 0;
+    int ss2 = 0;
+    int ss3 = 0;
+    int ss4 = 0;
+    int ss5 = 0;
+    int ss6 = 0;
+    int ss7 = 0;
+    int ss8 = 0;
+
+    int mcsidx = -1;
+    int bw = 0;
+    // bandwidth
+    //printf("bw: %d\n", pBeaconframe[6]);
+    eht80 = (pBeaconframe[5] & (mask0 | mask1 | mask2)); //EHT80. ss
+    eht160 = (pBeaconframe[5] >> 3 & (mask0 | mask1 | mask2)); //EHT160, ss
+    eht320 = (pBeaconframe[5] >> 6 & (mask0 | mask1 | mask2)); //EHT320, ss
+    //printf("\nbw: %d, eht80:%d, eht160:%d, eht320:%d\n", pBeaconframe[4], eht80, eht160, eht320);
+    if (eht320) {
+        bw = 4;
+        if (IELEN >= 21) {
+            rs = pBeaconframe[18] & (mask0 | mask1 | mask2 | mask3);
+            ts = (pBeaconframe[18] & (mask4 | mask5 | mask6 | mask7)) >> 4;
+            if (rs > 0 || ts > 0) {
+                //printf("EHT320 mcs0-9: %d\n", pBeaconframe[18]); //T/Rx MCS 0-9: 1ss~4ss
+                mcsidx = 144;
+                memcpy(iSS, &ts, sizeof(ts));
+            }
+            rs = pBeaconframe[19] & (mask0 | mask1 | mask2 | mask3);
+            ts = (pBeaconframe[19] & (mask4 | mask5 | mask6 | mask7)) >> 4;
+            if (rs > 0 || ts > 0) {
+                //printf("EHT320 mcs10-11: %d\n", pBeaconframe[19]); //T/Rx MCS 10-11: 1ss~4ss
+                mcsidx = 174;
+                memcpy(iSS, &ts, sizeof(ts));
+            }
+            rs = pBeaconframe[20] & (mask0 | mask1 | mask2 | mask3);
+            ts = (pBeaconframe[20] & (mask4 | mask5 | mask6 | mask7)) >> 4;
+            if (rs > 0 || ts > 0) {
+                //printf("EHT320 mcs12-13: %d\n", pBeaconframe[20]); //T/Rx MCS 12-13: 1ss~4ss
+                mcsidx = 204;
+                memcpy(iSS, &ts, sizeof(ts));
+            }
+        }
+    }
+    else if (eht160) {
+        bw = 3;
+        if (IELEN >= 18) {
+            rs = pBeaconframe[15] & (mask0 | mask1 | mask2 | mask3);
+            ts = (pBeaconframe[15] & (mask4 | mask5 | mask6 | mask7)) >> 4;
+            if (rs > 0 || ts > 0) {
+                //printf("EHT160 mcs0-9: %d\n", pBeaconframe[15]); //T/Rx MCS 0-9: 1ss~4ss
+                mcsidx = 140;
+                memcpy(iSS,&ts, sizeof(ts));
+            }
+            rs = pBeaconframe[16] & (mask0 | mask1 | mask2 | mask3);
+            ts = (pBeaconframe[16] & (mask4 | mask5 | mask6 | mask7)) >> 4;
+            if (rs > 0 || ts > 0) {
+                //printf("EHT160 mcs10-11: %d\n", pBeaconframe[16]); //T/Rx MCS 10-11: 1ss~4ss
+                mcsidx = 171;
+                memcpy(iSS, &ts, sizeof(ts));
+            }
+            rs = pBeaconframe[17] & (mask0 | mask1 | mask2 | mask3);
+            ts = (pBeaconframe[17] & (mask4 | mask5 | mask6 | mask7)) >> 4;
+            if (rs > 0 || ts > 0) {
+                //printf("EHT160 mcs12-13: %d\n", pBeaconframe[17]); //T/Rx MCS 12-13: 1ss~4ss
+                mcsidx = 201;
+                memcpy(iSS, &ts, sizeof(ts));
+            }
+        }
+    }
+    else if (eht80) {
+        bw = 2;
+        if (IELEN >= 15) {
+            rs = pBeaconframe[12] & (mask0 | mask1 | mask2 | mask3);
+            ts = (pBeaconframe[12] & (mask4 | mask5 | mask6 | mask7)) >> 4;
+            if (rs >0 || ts>0) {
+                //printf("EHT80 mcs0-9: Rx: %d\n", (pBeaconframe[12] & (mask0 | mask1 | mask2 | mask3))); //T/Rx MCS 0-9: 1ss~4ss
+                //printf("EHT80 mcs0-9: Tx: %d\n", (pBeaconframe[12] & (mask4 | mask5 | mask6 | mask7)) >> 4);
+                mcsidx = 137;
+                memcpy(iSS, &ts, sizeof(ts));
+            }
+            rs = pBeaconframe[13] & (mask0 | mask1 | mask2 | mask3);
+            ts = (pBeaconframe[13] & (mask4 | mask5 | mask6 | mask7)) >> 4;
+            if (rs > 0 || ts > 0) {
+                //printf("EHT80 mcs10-11:Rx: %d\n", (pBeaconframe[13] & (mask0 | mask1 | mask2 | mask3))); //T/Rx MCS 10-11: 1ss~4ss
+                //printf("EHT80 mcs10-11:Tx: %d\n", (pBeaconframe[13] & (mask4 | mask5 | mask6 | mask7)) >> 4); //T/Rx MCS 10-11: 1ss~4ss
+                mcsidx = 168;
+                memcpy(iSS, &ts, sizeof(ts));
+            }
+            rs = pBeaconframe[14] & (mask0 | mask1 | mask2 | mask3);
+            ts = (pBeaconframe[14] & (mask4 | mask5 | mask6 | mask7)) >> 4;
+            if (rs > 0 || ts > 0) {
+                //printf("EHT80 mcs12-13:Rx: %d\n", (pBeaconframe[14] & (mask0 | mask1 | mask2 | mask3))); //T/Rx MCS 12-13: 1ss~4ss
+                //printf("EHT80 mcs12-13:Tx: %d\n", (pBeaconframe[14] & (mask4 | mask5 | mask6 | mask7)) >> 4); //T/Rx MCS 12-13: 1ss~4ss
+                mcsidx = 198;
+                memcpy(iSS, &ts, sizeof(ts));
+            }
+        }
+    }
+    else if (eht40) {
+        bw = 1;
+    }
+    else {
+        bw = 0;
+    }
+    memcpy(bandwidth, &bw, sizeof(bw));
+
+    //printf("eht idx: %d\n", mcsidx);
+    memcpy(results, &mcsidx, sizeof(mcsidx));
+    
+}
+void
 FuncWlanHECapa(
     __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
     __out int* results, int* bandwidth)
@@ -1311,14 +1486,17 @@ FuncWlanParseIEs(
     int isHT40 = 0;
     int bw_vht = 0;
     int bw_he = 0;
+    int bw_eht = 0;
     int isSGI = 0;
     int vhtidx = -1;
     int heidx = -1;
+    int ehtidx = -1;
+    int iSS = 1;
     double ht_datarate = 0.0;
     double vht_datarate = 0.0;
     double he_datarate = 0.0;
+    double eht_datarate = 0.0;
 
-    //wcerr << "\n######## FuncWlanParseIEs--->########  \n";
     while (len >= 2) //minimum length for ID and Length field
     {
 
@@ -1403,6 +1581,11 @@ FuncWlanParseIEs(
                     break;
                 case EXTID_HEOPERATION:
                     break;
+                case EXTID_EHTCAPABILITIES:
+                    FuncWlanEHTCapa(IEID, IELEN, pBeaconframe, &ehtidx, &bw_eht, &iSS);
+                    break;
+                case EXTID_EHTOPERATION:
+                    break;
                 default:
                     break;
             }
@@ -1432,7 +1615,11 @@ FuncWlanParseIEs(
         //printf("he_datarate: %f \n", he_datarate);
         memcpy(rate_result, &he_datarate, sizeof(he_datarate));
     }
-    //wcerr << "######## FuncWlanParseIEs <---####" << datarate << "####  \n" ;
+    if (ehtidx >= 0) {
+        eht_datarate = get_EHTMCSRate(ehtidx, isSGI, bw_eht, iSS);
+        //printf("he_datarate: %f \n", he_datarate);
+        memcpy(rate_result, &eht_datarate, sizeof(eht_datarate));
+    }
 
 }
 //trying to print beacon or probe resp IE RAW data

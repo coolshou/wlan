@@ -40,7 +40,16 @@ constexpr std::uint_fast8_t mask4{ 0x10 }; // hex for 0001 0000
 constexpr std::uint_fast8_t mask5{ 0x20 }; // hex for 0010 0000
 constexpr std::uint_fast8_t mask6{ 0x40 }; // hex for 0100 0000
 constexpr std::uint_fast8_t mask7{ 0x80 }; // hex for 1000 0000
-
+/*
+constexpr std::uint_fast8_t mask8{0x100}; // hex for 0001 0000 0000
+constexpr std::uint_fast8_t mask9{ 0x200 }; // hex for 0010 0000 0000
+constexpr std::uint_fast8_t mask10{ 0x400 }; // hex for 0100 0000 0000
+constexpr std::uint_fast8_t mask11{ 0x800 }; // hex for 1000 0000 0000
+constexpr std::uint_fast8_t mask12{ 0x1000 }; // hex for 0001 0000 0000 0000
+constexpr std::uint_fast8_t mask13{ 0x2000 }; // hex for 0010 0000 0000 0000
+constexpr std::uint_fast8_t mask14{ 0x4000 }; // hex for 0100 0000 0000 0000
+constexpr std::uint_fast8_t mask15{ 0x8000 }; // hex for 1000 0000 0000 0000
+*/
 // Information elements
 #define IEID_HTCAPABILITIES  45
 #define IEID_HTINFORMATION   61
@@ -53,13 +62,16 @@ constexpr std::uint_fast8_t mask7{ 0x80 }; // hex for 1000 0000
 #define IEID_VHTCAPABILITIES 191
 #define IEID_VHTOPERATION    192
 #define IEID_VENDORSPEC	     221	
-#define IEID_EXT			 255  //11ax HE
-#define EXTID_HECAPABILITIES 35
-#define EXTID_HEOPERATION    36
+#define IEID_EXT			 255  
+#define EXTID_HECAPABILITIES 35  //11ax HE CAPABILITIES
+#define EXTID_HEOPERATION    36  //11ax HE OPERATION
+#define EXTID_EHTOPERATION    106  //11be EHT CAPABILITIES
+#define EXTID_EHTCAPABILITIES 108  //11be EHT OPERATION
 
 #include "ht_rate.h"
 #include "vht_rate.h"
 #include "he_rate.h"
+#include "eht_rate.h"
 
 #define MAX_KEY_LENGTH 255
 #define MAX_VALUE_NAME 16383
