@@ -1,4 +1,4 @@
-@echo OFF
+@echo ON
 
 set BAT=%0
 set sCMD=%1
@@ -23,19 +23,19 @@ echo ===================================
 exit /b
 
 :Build
+set VCPATH="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\"
+set PATH=%VCPATH%;%PATH%
 set LIB=""
 set LIBPATH=""
 set INCLUDE=""
-set Path="%SystemRoot%\System32\"
-call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat"
-REM call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat"
-REM call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86
+REM set Path="%SystemRoot%\System32\"
+%comspec% /k "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat"
+REM call "%VCPATH%vcvars32.bat"
+REM call "vcvarsall.bat" x86
 MSBuild wlan.sln /m /t:Rebuild /p:Configuration=Release;Platform=Win32
 mt -manifest "wlan.exe.manifest"  -outputresource:"Win32\Release\wlan.exe;#1"
 
-call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
-REM call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
-REM call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
+call "vcvarsall.bat" amd64
 MSBuild wlan.sln /m /t:Rebuild /p:Configuration=Release;Platform=x64
 mt -manifest "wlan.exe.manifest"  -outputresource:"x64\Release\wlan.exe;#1"
 
@@ -45,7 +45,7 @@ exit /b
 set LIB=""
 set LIBPATH=""
 set INCLUDE=""
-set Path="%SystemRoot%\System32\"
+REM set Path="%SystemRoot%\System32\"
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat"
 REM call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat"
 REM call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86
