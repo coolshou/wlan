@@ -1275,6 +1275,7 @@ FuncWlanHECapa(
     printf("\n");
     printf("******IE Information Feild***** \n");
     */
+    
     int ss1 = 0;
     int ss2 = 0;
     int ss3 = 0;
@@ -1367,7 +1368,15 @@ FuncWlanHECapa(
         memcpy(results, &mcsidx, sizeof(mcsidx));
     }
 }
+void
+FuncWlanHEOper(
+    __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
+    __out int* bssColor)
+{ //HE Operation
+// Extract BSS Color
+    *bssColor = pBeaconframe[4] & 0x3F; // Assuming BSS Color is at byte 4 and uses 6 bits
 
+}
 void 
 FuncWlanVHTCapa(
     __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
@@ -1479,7 +1488,7 @@ FuncWlanIEPrint(
 void 
 FuncWlanParseIEs(
     __in PBYTE pBeaconframe, int SizeData,
-    __out double* rate_result)
+    __out double* rate_result, int* bsscolor_result)
 {
     int len = SizeData;
     int htidx = -1;
@@ -1491,6 +1500,7 @@ FuncWlanParseIEs(
     int vhtidx = -1;
     int heidx = -1;
     int ehtidx = -1;
+    int iBSSColor = -1;
     int iSS = 1;
     double ht_datarate = 0.0;
     double vht_datarate = 0.0;
@@ -1578,8 +1588,11 @@ FuncWlanParseIEs(
                 case EXTID_HECAPABILITIES:
                     FuncWlanHECapa(IEID, IELEN, pBeaconframe, &heidx, &bw_he);
                     //printf("he idx: %d, %d\n", heidx, bw_he);
+                    
                     break;
                 case EXTID_HEOPERATION:
+                    FuncWlanHEOper(IEID, IELEN, pBeaconframe, &iBSSColor);
+                    memcpy(bsscolor_result, &iBSSColor, sizeof(iBSSColor));
                     break;
                 case EXTID_EHTCAPABILITIES:
                     FuncWlanEHTCapa(IEID, IELEN, pBeaconframe, &ehtidx, &bw_eht, &iSS);
@@ -1701,12 +1714,13 @@ VOID PrintBssInfo(
         rate_in_mbps = (rate & 0x7FFF) * 0.5;
         //TODO: get 11n/ac/ax rate
         double datarate = 0.0;
+        int iBSSColor=-1;
         PBYTE pBlob = NULL;
         //moving pointer the correct offset
         pBlob = (PBYTE)(pBss)+pBss->ulIeOffset;
         //IE data size
         memcpy((void*)pBeaconframe, (void*)pBlob, pBss->ulIeSize);
-        FuncWlanParseIEs(&pBeaconframe[0], pBss->ulIeSize, &datarate);
+        FuncWlanParseIEs(&pBeaconframe[0], pBss->ulIeSize, &datarate, &iBSSColor);
         if (datarate > rate_in_mbps) {
             rate_in_mbps = datarate;
         }
@@ -1714,10 +1728,11 @@ VOID PrintBssInfo(
         wcout << L"\t";
         wcout << GetPhyTypeString(pBss->dot11BssPhyType);
         wcout << L"\t";
+        wcout << iBSSColor;
         //TODO: parser ulIeOffset/ulIeSize
-        wcout << pBss->ulIeOffset;
-        wcout << L"\t";
-        wcout << pBss->ulIeSize;
+        //wcout << pBss->ulIeOffset;
+        //wcout << L"\t";
+        //wcout << pBss->ulIeSize;
         wcout << endl;
     }
 }
