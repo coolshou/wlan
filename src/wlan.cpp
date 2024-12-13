@@ -1255,6 +1255,7 @@ FuncWlanEHTCapa(
     memcpy(results, &mcsidx, sizeof(mcsidx));
     
 }
+
 void
 FuncWlanHECapa(
     __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
@@ -1377,6 +1378,22 @@ FuncWlanHEOper(
     *bssColor = pBeaconframe[4] & 0x3F; // Assuming BSS Color is at byte 4 and uses 6 bits
 
 }
+
+void
+FuncWlanEHTOper(
+    __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe, 
+    __out int* iPPBitmap)
+{ //EHT Operation
+    //Disable subchannel bitmap present, 1: true, 0: false
+    int dsbitmap ;
+    dsbitmap = pBeaconframe[1] & 0x02; // At byte 1 use bit 1
+    // printf("Disable subchannel bitmap: %d\n", dsbitmap);
+    if (dsbitmap>0) {
+            *iPPBitmap = (pBeaconframe[10]<<8) | pBeaconframe[9]; // // At byte 9,10 
+            // printf("Disable subchannel bitmap: %d", *iPPBitmap);
+    }
+}
+
 void 
 FuncWlanVHTCapa(
     __in BYTE IEID, BYTE IELEN, PBYTE pBeaconframe,
@@ -1488,7 +1505,7 @@ FuncWlanIEPrint(
 void 
 FuncWlanParseIEs(
     __in PBYTE pBeaconframe, int SizeData,
-    __out double* rate_result, int* bsscolor_result)
+    __out double* rate_result, int* bsscolor_result, int* ppbitmap_result)
 {
     int len = SizeData;
     int htidx = -1;
@@ -1501,6 +1518,7 @@ FuncWlanParseIEs(
     int heidx = -1;
     int ehtidx = -1;
     int iBSSColor = -1;
+    int iPPBitmap = -1;
     int iSS = 1;
     double ht_datarate = 0.0;
     double vht_datarate = 0.0;
@@ -1598,6 +1616,8 @@ FuncWlanParseIEs(
                     FuncWlanEHTCapa(IEID, IELEN, pBeaconframe, &ehtidx, &bw_eht, &iSS);
                     break;
                 case EXTID_EHTOPERATION:
+                    FuncWlanEHTOper(IEID, IELEN, pBeaconframe, &iPPBitmap);
+                    memcpy(ppbitmap_result, &iPPBitmap, sizeof(iPPBitmap));
                     break;
                 default:
                     break;
@@ -1715,12 +1735,13 @@ VOID PrintBssInfo(
         //TODO: get 11n/ac/ax rate
         double datarate = 0.0;
         int iBSSColor=-1;
+        int iPPBitmap=-1;
         PBYTE pBlob = NULL;
         //moving pointer the correct offset
         pBlob = (PBYTE)(pBss)+pBss->ulIeOffset;
         //IE data size
         memcpy((void*)pBeaconframe, (void*)pBlob, pBss->ulIeSize);
-        FuncWlanParseIEs(&pBeaconframe[0], pBss->ulIeSize, &datarate, &iBSSColor);
+        FuncWlanParseIEs(&pBeaconframe[0], pBss->ulIeSize, &datarate, &iBSSColor, &iPPBitmap);
         if (datarate > rate_in_mbps) {
             rate_in_mbps = datarate;
         }
@@ -1729,6 +1750,8 @@ VOID PrintBssInfo(
         wcout << GetPhyTypeString(pBss->dot11BssPhyType);
         wcout << L"\t";
         wcout << iBSSColor;
+        wcout << L"\t";
+        wcout << iPPBitmap;
         //TODO: parser ulIeOffset/ulIeSize
         //wcout << pBss->ulIeOffset;
         //wcout << L"\t";
