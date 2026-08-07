@@ -23,13 +23,13 @@ echo ===================================
 exit /b
 
 :Build
-set VCPATH="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\"
+set VCPATH="C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\"
 set PATH=%VCPATH%;%PATH%
 set LIB=""
 set LIBPATH=""
 set INCLUDE=""
 REM set Path="%SystemRoot%\System32\"
-%comspec% /k "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat"
+%comspec% /k "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
 REM call "%VCPATH%vcvars32.bat"
 REM call "vcvarsall.bat" x86
 MSBuild wlan.sln /m /t:Rebuild /p:Configuration=Release;Platform=Win32
@@ -46,12 +46,12 @@ set LIB=""
 set LIBPATH=""
 set INCLUDE=""
 REM set Path="%SystemRoot%\System32\"
-call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat"
+call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
 REM call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars32.bat"
 REM call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86
 MSBuild wlan.sln /m /t:clean /p:Configuration=Release;Platform=Win32
 
-call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
+call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
 REM call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
 REM call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64
 MSBuild wlan.sln /m /t:clean /p:Configuration=Release;Platform=x64
