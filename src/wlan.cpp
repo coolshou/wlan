@@ -4879,8 +4879,12 @@ Connect(
 			// the desired BSSID list is empty (XP must NULL)
 			wlanConnPara.pDesiredBssidList = NULL;
 		}
-        // no connection flags
-        wlanConnPara.dwFlags = 0;
+		// 6. add  dwFlags support hidden SSID
+        // set WLAN_CONNECTION_HIDDEN_NETWORK will force adapter send Probe Request to find hidden AP
+        wlanConnPara.dwFlags = WLAN_CONNECTION_HIDDEN_NETWORK;
+
+        // if need to allow connect to Ad-hoc network，use OR ：
+        // wlanConnPara.dwFlags = WLAN_CONNECTION_HIDDEN_NETWORK | WLAN_CONNECTION_ADHOC_JOIN_ONLY;
 
         // open handle
         if ((dwError = OpenHandleAndCheckVersion(
