@@ -4779,6 +4779,24 @@ GetBssList(
 	return dwError;
 }
 
+// helper function：convert MAC address (eq: "00-11-22-33-44-55" or "00:11:22:33:44:55") to DOT11_MAC_ADDRESS
+DWORD StringToMacAddress(__in LPCWSTR strMac, __out DOT11_MAC_ADDRESS macAddr)
+{
+    unsigned int mac[6];
+    if (swscanf_s(strMac, L"%02x:%02x:%02x:%02x:%02x:%02x", 
+                  &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]) != 6 &&
+        swscanf_s(strMac, L"%02x-%02x-%02x-%02x-%02x-%02x", 
+                  &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]) != 6)
+    {
+        return ERROR_INVALID_PARAMETER;
+    }
+
+    for (int i = 0; i < 6; i++)
+    {
+        macAddr[i] = (UCHAR)mac[i];
+    }
+    return ERROR_SUCCESS;
+}
 //https://msdn.microsoft.com/en-us/library/windows/desktop/ms706851(v=vs.85).aspx
 // connect to a network using a saved profile
 DWORD
@@ -4793,10 +4811,9 @@ Connect(
     GUID guidIntf;
     DOT11_SSID dot11Ssid = {0};
     WLAN_CONNECTION_PARAMETERS wlanConnPara;
-	/*
-	if (argc == 6) {
-		string macstring = CW2A(argv[5]);
-	}*/
+	// 宣告可容納 1 個 BSSID 的結構體
+    DOT11_BSSID_LIST desiredBssidList = {0};
+	
     __try
     {
         if (argc < 5)
@@ -4838,42 +4855,20 @@ Connect(
         }
 		
 		if (OSMajor >= 6) {
-			
 			if (argc == 6) {
-				// DOT11_BSSID_LIST 
-				DOT11_BSSID_LIST DesiredBssidList;
+				desiredBssidList.Header.Type = NDIS_OBJECT_TYPE_DEFAULT;
+                desiredBssidList.Header.Revision = DOT11_BSSID_LIST_REVISION_1;
+                desiredBssidList.Header.Size = sizeof(DOT11_BSSID_LIST);
+                desiredBssidList.uNumOfEntries = 1;
+                desiredBssidList.uTotalNumOfEntries = 1;
 
-				//WLAN_BSS_LIST *bsslst;
-				//WlanGetNetworkBssList(hClientHandle, &pIfInfo->InterfaceGuid, &pBssList->Network[j].dot11Ssid, pBssList->Network[j].dot11BssType, true, NULL, &bsslst);
-				DesiredBssidList.Header.Type = NDIS_OBJECT_TYPE_DEFAULT;
-				DesiredBssidList.Header.Revision = DOT11_BSSID_LIST_REVISION_1;
-				DesiredBssidList.Header.Size = sizeof(DOT11_BSSID_LIST);
-				DesiredBssidList.uNumOfEntries = 1; // If I change this to 0, it connects without a problem, but I can't control to which AP
-				DesiredBssidList.uTotalNumOfEntries = 1;
-				
-				//unsigned char MAC[6];
-				//vector<string> R; //cause VC C2712
-				/*
-				uint8_t R[6];
-				
-				
-				
-				//if ((dwError = StringWToBSSID(macstring, &R)) != ERROR_SUCCESS) {
-				if ((dwError = StringWToBSSID(macstring, R)) != ERROR_SUCCESS) {
-					dwError = ERROR_INVALID_PARAMETER;
-					__leave;
-				}
-				//for (int i = 0; (i < 6) && (i < R.size()); ++i) {
-				for (int i = 0; (i < 6); ++i) {
-					//MAC[i] = (unsigned char)strtoul(R[i].c_str(), NULL, 16);
-					//DesiredBssidList.BSSIDs[0][i] = (unsigned char)strtoul(R[i].c_str(), NULL, 16);
-					DesiredBssidList.BSSIDs[0][i] = R[i];
-				}
-				printf("BSSID %02x:%02x:%02x:%02x:%02x:%02x\n",
-					DesiredBssidList.BSSIDs[0][0], DesiredBssidList.BSSIDs[0][1],
-					DesiredBssidList.BSSIDs[0][2], DesiredBssidList.BSSIDs[0][3],
-					DesiredBssidList.BSSIDs[0][3], DesiredBssidList.BSSIDs[0][5]);
-					*/
+                // 解析 argv[5] 並將 MAC 地址寫入 BSSIDs[0]
+                dwError = StringToMacAddress(argv[5], desiredBssidList.BSSIDs[0]);
+                if (dwError != ERROR_SUCCESS)
+                {
+                    wcerr << L"Invalid BSSID MAC Address: " << argv[5] << endl;
+                    __leave;
+                }
 				wlanConnPara.pDesiredBssidList = &DesiredBssidList;
 			}
 			else {
