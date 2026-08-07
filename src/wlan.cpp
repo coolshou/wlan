@@ -4869,7 +4869,7 @@ Connect(
                     wcerr << L"Invalid BSSID MAC Address: " << argv[5] << endl;
                     __leave;
                 }
-				wlanConnPara.pDesiredBssidList = &DesiredBssidList;
+				wlanConnPara.pDesiredBssidList = &desiredBssidList;
 			}
 			else {
 				wlanConnPara.pDesiredBssidList = NULL;
